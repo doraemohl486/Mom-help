@@ -11,15 +11,22 @@
 </head>
 <body>
 <div class="g-app" id="gApp">
-  <header class="g-top">
+  <div class="splash" id="gSplash" aria-hidden="true">
+    <div class="splash-in">
+      <div class="splash-road"><span class="splash-car" data-ic="taxi"></span></div>
+      <div class="splash-logo">엄빠<b>어디가야</b></div>
+      <div class="splash-tag">엄마 아빠 가는 길, 같이 챙겨요</div>
+    </div>
+  </div>
+  <header class="app-top">
     <div class="wordmark">엄빠<b>어디가야</b></div>
     <div class="fam" id="famChips"></div>
   </header>
 
-  <main class="g-main">
+  <main class="app-main" id="gMain">
     <!-- 홈 -->
     <section class="g-view on" id="view-home">
-      <div class="summary"><h1 id="summary">오늘 일정을 불러오는 중이에요</h1></div>
+      <h1 class="summary" id="summary">오늘 일정을 불러오는 중이에요</h1>
       <div id="setupHint" class="card" hidden>
         <b>먼저 부모님을 등록해 주세요</b>
         <p class="muted">집 주소와 휴대폰 번호가 있어야 알림을 보내고 택시를 부를 수 있어요.</p>
@@ -30,8 +37,8 @@
         <h2 class="sec">확인이 필요해요 <span class="count" id="draftCount"></span></h2>
         <div id="drafts" class="stack"></div>
       </div>
-      <div class="row between cal-bar">
-        <h2 class="sec" style="margin:0">전체 일정</h2>
+      <div class="bar">
+        <h2 class="sec">전체 일정</h2>
         <div class="seg seg-sm" id="homeMode" role="tablist">
           <button type="button" data-v="cal" class="on">달력</button><button type="button" data-v="list">목록</button>
         </div>
@@ -80,7 +87,7 @@
     </section>
   </main>
 
-  <nav class="g-tabs" id="gTabs" aria-label="화면 이동">
+  <nav class="app-bottom g-tabs" id="gTabs" aria-label="화면 이동">
     <button type="button" data-view="home" class="on"><span data-ic="home"></span>홈</button>
     <button type="button" data-view="alerts"><span data-ic="bell"></span>알림<span class="dot" id="alertDot" hidden></span></button>
     <button type="button" class="g-add" id="addSchedBtn" aria-label="일정 추가"><span data-ic="plus"></span></button>
@@ -95,7 +102,7 @@
     <div class="sheet-head"><h3>부모님 정보</h3></div>
     <label for="pname">호칭</label>
     <div class="seg" id="pNameSeg"><button type="button" data-v="엄마">엄마</button><button type="button" data-v="아빠">아빠</button></div>
-    <input id="pname" name="pname" placeholder="예: 엄마" required style="margin-top:8px" />
+    <input id="pname" class="gap-top" name="pname" placeholder="예: 엄마" required />
     <label for="real_name">성함 (콜센터에 알려 드릴 이름)</label>
     <input id="real_name" name="real_name" placeholder="예: 김영희" required />
     <label for="phone">휴대폰 번호 (배차 문자를 받을 번호)</label>
@@ -103,7 +110,7 @@
     <label for="homeQuery">집 주소 (택시 출발지)</label>
     <input id="homeQuery" name="placeQuery" placeholder="주소나 아파트 이름 검색" autocomplete="off" />
     <div class="results" id="homeResults" hidden></div>
-    <input id="home_address" name="home_address" placeholder="검색해서 골라 주세요" readonly required style="margin-top:8px" />
+    <input id="home_address" class="gap-top" name="home_address" placeholder="검색해서 골라 주세요" readonly required />
     <input type="hidden" name="home_lat" /><input type="hidden" name="home_lng" />
     <label for="preferred_mode">평소 좋아하시는 교통수단</label>
     <select id="preferred_mode" name="preferred_mode">
@@ -125,9 +132,9 @@
     <label>누구 일정이에요?</label>
     <div class="seg" id="whoSeg"></div>
     <details class="paste" id="pasteBox">
-      <summary><span data-ic="sms"></span>병원 예약 문자 붙여넣기 <span class="muted" style="font-weight:600">· 알아서 채워 드려요</span></summary>
+      <summary><span data-ic="sms"></span>병원 예약 문자 붙여넣기 <span class="muted">· 알아서 채워 드려요</span></summary>
       <textarea id="smsText" name="smsText" rows="4" placeholder="[OO병원] 김영희님 11/12(목) 10:30 정형외과 진료 예약..."></textarea>
-      <button type="button" class="btn dark small" id="parseBtn" style="margin-top:8px">자동으로 채우기</button>
+      <button type="button" class="btn dark small gap-top" id="parseBtn">자동으로 채우기</button>
     </details>
     <input type="hidden" name="draft_id" />
     <label for="title">무슨 일정?</label>
@@ -142,7 +149,7 @@
     <label for="placeQuery">어디?</label>
     <input id="placeQuery" name="placeQuery" placeholder="병원·장소 이름 검색" autocomplete="off" />
     <div class="results" id="placeResults" hidden></div>
-    <input id="place_name" name="place_name" placeholder="검색해서 골라 주세요" readonly required style="margin-top:8px" />
+    <input id="place_name" class="gap-top" name="place_name" placeholder="검색해서 골라 주세요" readonly required />
     <input type="hidden" name="place_address" /><input type="hidden" name="place_lat" /><input type="hidden" name="place_lng" />
     <label for="memo">메모 (알림에 같이 보내요)</label>
     <input id="memo" name="memo" placeholder="예: 공복으로 가셔야 해요" />
@@ -157,7 +164,7 @@
 <dialog id="conflictDlg">
   <div class="sheet">
     <div class="sheet-head"><h3 id="conflictTitle">이미 같은 일정이 있어요</h3></div>
-    <div id="conflictList" class="stack" style="margin-top:12px"></div>
+    <div id="conflictList" class="stack gap-top"></div>
     <div class="sheet-actions">
       <button class="btn" type="button" id="conflictCancel">저장 안 할게요</button>
       <button class="btn primary" type="button" id="conflictForce">그래도 저장</button>

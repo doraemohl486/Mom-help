@@ -1,4 +1,5 @@
-// 부모님 간편 화면: 큰 글씨, 한 화면에 한 가지 질문, 버튼 3개 이하, 소리로 듣기
+// 부모님 간편 화면: 큰 글씨, 한 화면에 한 가지 질문, 버튼 3개 이하, 소리로 듣기·말로 하기
+// 폰 한 화면 틀: 위(날짜·말하기) 고정 · 가운데만 스크롤 · 아래(달력·일정 알려주기) 고정
 // 체험판에서는 window.DEMO_PARENT_TOKEN 으로 바꿔 끼울 수 있다
 const tok = () => window.DEMO_PARENT_TOKEN || location.pathname.split("/").pop();
 const app = document.getElementById("app");
@@ -7,6 +8,7 @@ const ic = (name) => (window.ICONS && window.ICONS[name]) || "";
 const TZ = "Asia/Seoul";
 const time = new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: TZ });
 const longDay = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "long", timeZone: TZ });
+const shortDay = new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", timeZone: TZ });
 const fullWhen = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short", hour: "numeric", minute: "2-digit", timeZone: TZ });
 const seoulDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(d);
 const nowDate = () => (window.demo?.now ? window.demo.now() : new Date());
@@ -20,6 +22,7 @@ let data = null;
 let lastKey = "";
 let busy = false;
 let mode = "home"; // home | input | calendar — home이 아닐 때는 자동 새로고침으로 화면을 바꾸지 않음
+let sayText = ""; // 🔊 버튼으로 읽어 줄 말 (화면마다 바뀜)
 
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
@@ -56,10 +59,32 @@ function countdown(d) {
   return `${Math.round(h / 24)}일 뒤`;
 }
 
+// ---------------------------------------------------------------- 시작 화면
+const splash = document.createElement("div");
+splash.className = "splash";
+splash.setAttribute("aria-hidden", "true");
+splash.innerHTML = `<div class="splash-in">
+  <div class="splash-road"><span class="splash-car">${ic("taxi")}</span></div>
+  <div class="splash-logo">엄빠<b>어디가야</b></div>
+  <div class="splash-tag">오늘 갈 곳, 같이 챙겨 드려요</div>
+</div>`;
+app.parentElement.insertBefore(splash, app);
+const splashStart = Date.now();
+function hideSplash() {
+  if (splash.classList.contains("done")) return;
+  setTimeout(() => splash.classList.add("done"), Math.max(0, 1200 - (Date.now() - splashStart)));
+}
+
 async function load() {
-  const res = await fetch(`/api/p/${tok()}`);
+  let res;
+  try {
+    res = await fetch(`/api/p/${tok()}`);
+  } catch {
+    return;
+  }
+  hideSplash();
   if (!res.ok) {
-    app.innerHTML = `<div class="p-app"><div class="p-main"><div class="status"><h2>링크가 올바르지 않아요</h2><p>자녀에게 다시 보내 달라고 해 주세요.</p></div></div></div>`;
+    app.innerHTML = `<div class="p-app"><main class="app-main p-main"><div class="card status"><h2>링크가 올바르지 않아요</h2><p>자녀에게 다시 보내 달라고 해 주세요.</p></div></main></div>`;
     return;
   }
   data = await res.json();
@@ -75,22 +100,35 @@ async function load() {
   }
 }
 
-// ---------------------------------------------------------------- 그리기
-function shell(main, foot = true) {
-  const n = nowDate();
+// ---------------------------------------------------------------- 틀
+function micBtn() {
+  return `<button class="p-mic" type="button" data-mic aria-label="말로 하기">${ic("mic")}<span>말하기</span></button>`;
+}
+
+/** 위: 제목 + 🔊 + 🎤 / 가운데: 내용 / 아래: 버튼 줄 */
+function frame({ title, sub = "", main, bottom = "" }) {
   app.innerHTML = `<div class="p-app">
-    <header class="p-top p-top-row">
-      <div><div class="p-date">${esc(longDay.format(n))}</div>
-      <div class="p-hello">${esc(data.parent.name)}, 안녕하세요</div></div>
-      ${micBtn()}
+    <header class="app-top">
+      <div>${sub ? `<div class="p-date">${esc(sub)}</div>` : ""}<div class="p-hello">${title}</div></div>
+      <div class="p-tools">
+        <button class="round-btn" id="say" type="button" data-voice="repeat" aria-label="소리로 듣기">${ic("speaker")}</button>
+        ${micBtn()}
+      </div>
     </header>
-    <main class="p-main">${main}</main>
-    ${foot ? `<footer class="p-foot stack">
-      <button class="bigbtn ghost" id="openCal" type="button" data-voice="calendar">${ic("cal")}달력 보기</button>
-      <button class="bigbtn ghost" id="addSched" type="button" data-voice="add">${ic("edit")}일정 알려주기</button></footer>` : ""}
+    <main class="app-main p-main">${main}</main>
+    ${bottom ? `<nav class="app-bottom p-bottom">${bottom}</nav>` : ""}
   </div>`;
+  document.getElementById("say").onclick = () => speak(sayText || "말하기 버튼을 누르고 말씀해 주세요.");
+}
+
+const HOME_BOTTOM = `
+  <button class="bigbtn ghost" id="openCal" type="button" data-voice="calendar">${ic("cal")}달력</button>
+  <button class="bigbtn ghost" id="addSched" type="button" data-voice="add">${ic("edit")}일정 알려주기</button>`;
+
+function shell(main, foot = true) {
+  frame({ sub: longDay.format(nowDate()), title: `${esc(data.parent.name)}, 안녕하세요`, main, bottom: foot ? HOME_BOTTOM : "" });
   const b = document.getElementById("addSched");
-  if (b) b.onclick = openInput;
+  if (b) b.onclick = () => openInput();
   const c = document.getElementById("openCal");
   if (c) c.onclick = () => openCalendar();
 }
@@ -100,11 +138,9 @@ function apptCard(s) {
   const t = splitTime(d);
   const cd = countdown(d);
   return `<div class="card appt">
-    <div class="appt-when"><span class="appt-day">${esc(dayWord(d))} ${esc(t.ampm)}</span><span class="num">${esc(t.hm)}</span></div>
+    <div class="appt-when"><span class="appt-day">${esc(dayWord(d))} ${esc(t.ampm)}</span><span class="num">${esc(t.hm)}</span>${cd ? `<span class="tag count">${esc(cd)}</span>` : ""}</div>
     <div class="appt-place">${ic(s.kind) || ic("기타")}<span>${esc(s.place_name)}</span></div>
-    <div class="appt-memo">${esc(s.title)}</div>
-    ${s.memo ? `<div><span class="memo-chip">${esc(s.memo)}</span></div>` : ""}
-    ${cd ? `<span class="countdown">${esc(cd)}</span>` : ""}
+    <div class="appt-meta"><span>${esc(s.title)}</span>${s.memo ? `<span class="tag memo">${esc(s.memo)}</span>` : ""}</div>
   </div>`;
 }
 
@@ -112,20 +148,25 @@ function upcomingList() {
   if (!data.upcoming.length) return "";
   return `<div class="card next-list"><h3>다음 일정</h3>${data.upcoming.map((u) => {
     const d = new Date(u.start_at);
-    return `<div class="next-row"><span class="num">${esc(seoulDay(d) === seoulDay(nowDate()) ? time.format(d) : new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric", timeZone: TZ }).format(d))}</span><span>${esc(u.place_name)}</span></div>`;
+    return `<div class="next-row"><span class="num">${esc(seoulDay(d) === seoulDay(nowDate()) ? time.format(d) : shortDay.format(d))}</span><span>${esc(u.place_name)}</span></div>`;
   }).join("")}</div>`;
 }
 
+const whenSay = (s) => `${dayWord(new Date(s.start_at))} ${time.format(new Date(s.start_at))} ${s.place_name}`;
+
+// ---------------------------------------------------------------- 화면
 function render() {
   const s = data.current;
   if (!s) {
+    sayText = "예정된 일정이 없어요. 병원 예약이 생기면 일정 알려주기를 눌러 주세요.";
     shell(`<div class="card status"><div class="big-ic ok">${ic("check")}</div><h2>예정된 일정이 없어요</h2>
-      <p>병원 예약이 생기면<br>아래 버튼으로 알려 주세요.</p></div>`);
+      <p>병원 예약이 생기면<br>아래 '일정 알려주기'를 눌러 주세요.</p></div>`);
     return;
   }
   const call = s.calls[s.calls.length - 1];
 
   if (s.status === "calling") {
+    sayText = "AI 비서가 콜택시에 전화하고 있어요. 조금만 기다려 주세요.";
     shell(apptCard(s) + `<div class="card status"><div class="big-ic ring">${ic("phone")}</div>
       <h2>택시 부르는 중이에요</h2><p>AI 비서가 콜택시에 전화하고 있어요.<br>조금만 기다려 주세요.</p></div>`, false);
     return;
@@ -134,43 +175,45 @@ function render() {
   if (s.status === "dispatched" && call) {
     const arrive = call.eta_minutes ? new Date(new Date(call.updated_at).getTime() + call.eta_minutes * 60000) : null;
     const at = arrive ? splitTime(arrive) : null;
+    sayText = `택시가 와요. 차 번호는 ${call.car_number}. ${call.car_description || ""}. ${arrive ? time.format(arrive) : ""} 도착해요.`;
     shell(`<div class="card status">
         <div class="big-ic">${ic("taxi")}</div>
         <h2>택시가 와요!</h2>
         <div class="plate">${esc(call.car_number || "")}</div>
         <p>${esc(call.car_description || "")}</p>
-        ${at ? `<div class="eta">${esc(at.ampm)} <span class="num">${esc(at.hm)}</span> 도착</div>` : ""}
+        ${at ? `<div class="eta"><span>${esc(at.ampm)}</span><span class="num">${esc(at.hm)}</span><span>도착</span></div>` : ""}
         <p>${esc(s.place_name)}까지 모셔다 드려요</p>
-      </div>
-      <button class="bigbtn ghost" id="say" type="button" data-voice="repeat">${ic("speaker")}소리로 듣기</button>
-      <button class="bigbtn" id="arrived" type="button" data-voice="arrived">${ic("check")}도착했어요</button>`, false);
-    document.getElementById("say").onclick = () => speak(`택시가 와요. 차 번호는 ${call.car_number}. ${call.car_description || ""}. ${arrive ? time.format(arrive) : ""} 도착해요.`);
+      </div>`, false);
+    // 아래 버튼 줄: 도착했어요
+    app.querySelector(".p-app").insertAdjacentHTML("beforeend",
+      `<nav class="app-bottom"><button class="bigbtn" id="arrived" type="button" data-voice="arrived">${ic("check")}도착했어요</button></nav>`);
     document.getElementById("arrived").onclick = () => post("arrived", {}, "자녀에게 알렸어요. 잘 다녀오세요!");
     return;
   }
 
   if (s.status === "taxi_reserved" && s.taxi_call_at) {
     const c = splitTime(new Date(s.taxi_call_at));
+    sayText = `${whenSay(s)} 가시죠. ${time.format(new Date(s.taxi_call_at))}에 택시 불러 드릴게요.`;
     shell(apptCard(s) + `<div class="card status">
         <div class="big-ic ok">${ic("clock")}</div>
         <h2>택시 예약했어요</h2>
-        <div class="clock"><span style="font-size:24px;font-weight:700">${esc(c.ampm)}</span> <span class="num">${esc(c.hm)}</span></div>
-        <p>이 시간에 AI 비서가 택시를 불러 드려요.<br>차가 오면 알려 드릴게요.</p>
+        <div class="clock"><span>${esc(c.ampm)}</span><span class="num">${esc(c.hm)}</span></div>
+        <p>이 시간에 AI 비서가 택시를 불러 드려요.</p>
       </div>
-      <button class="bigbtn" id="now" type="button" data-voice="now taxi">${ic("taxi")}지금 바로 불러줘</button>
-      <button class="bigbtn ghost" id="say" type="button" data-voice="repeat">${ic("speaker")}소리로 듣기</button>` + upcomingList());
+      <button class="bigbtn" id="now" type="button" data-voice="now taxi">${ic("taxi")}지금 바로 불러줘</button>` + upcomingList());
     document.getElementById("now").onclick = () => post("call-now", {}, "지금 택시 불러 드릴게요");
-    document.getElementById("say").onclick = () => speak(`${dayWord(new Date(s.start_at))} ${time.format(new Date(s.start_at))} ${s.place_name} 가시죠. ${time.format(new Date(s.taxi_call_at))}에 택시 불러 드릴게요.`);
     return;
   }
 
   if (s.status === "chosen" && s.chosen_mode) {
     const t = s.route_options?.options.find((o) => o.mode === s.chosen_mode);
-    const msg = s.chosen_mode === "transit"
-      ? `약 <b class="num" style="font-size:28px">${t?.durationMin ?? "?"}분</b> 걸려요<br>걷는 거리 ${t?.walkMeters ?? "?"}m${s.departure_at ? `<br>${esc(time.format(new Date(s.departure_at)))}쯤 나가세요` : ""}`
+    const transit = s.chosen_mode === "transit";
+    sayText = transit ? `버스나 지하철로 가세요. 약 ${t?.durationMin ?? ""}분 걸려요.` : "자녀에게 부탁했어요. 곧 연락 올 거예요.";
+    const msg = transit
+      ? `약 ${t?.durationMin ?? "?"}분 · 걷기 ${t?.walkMeters ?? "?"}m${s.departure_at ? `<br>${esc(time.format(new Date(s.departure_at)))}쯤 나가세요` : ""}`
       : "자녀에게 부탁했어요.<br>곧 연락 올 거예요.";
     shell(apptCard(s) + `<div class="card status"><div class="big-ic ok">${ic(MODE[s.chosen_mode].icon)}</div>
-        <h2>${MODE[s.chosen_mode].t}${s.chosen_mode === "transit" ? "로 가요" : ""}</h2><p>${msg}</p></div>
+        <h2>${MODE[s.chosen_mode].t}${transit ? "로 가요" : ""}</h2><p>${msg}</p></div>
       <button class="bigbtn" id="arrived" type="button" data-voice="arrived">${ic("check")}도착했어요</button>` + upcomingList());
     document.getElementById("arrived").onclick = () => post("arrived", {}, "자녀에게 알렸어요. 잘 다녀오세요!");
     return;
@@ -179,7 +222,7 @@ function render() {
   // 아직 고르지 않음 (예정 / 물어보는 중 / 무응답 / 호출 실패)
   const cmp = s.route_options;
   const failed = s.status === "call_failed"
-    ? `<div class="card status" style="border-color:var(--bad)"><div class="big-ic bad">${ic("warn")}</div><h2>택시를 못 불렀어요</h2><p>자녀에게 알렸어요.<br>다른 방법을 골라도 돼요.</p></div>` : "";
+    ? `<div class="card status bad"><div class="big-ic sm bad">${ic("warn")}</div><h2>택시를 못 불렀어요</h2><p>자녀에게 알렸어요. 다른 방법을 골라도 돼요.</p></div>` : "";
   const choices = cmp ? cmp.options.map((o) => {
     const m = MODE[o.mode];
     const detail = o.mode === "family" ? "자녀에게 부탁하기"
@@ -187,13 +230,13 @@ function render() {
     return `<button class="choice ${o.mode === cmp.recommended ? "rec" : ""}" data-mode="${o.mode}" data-voice="${o.mode}" type="button">
       ${o.mode === cmp.recommended ? `<span class="badge">추천</span>` : ""}
       <span class="ic">${ic(m.icon)}</span>
-      <span><span class="t" style="display:block">${m.t}</span><span class="d" style="display:block">${esc(detail)}</span></span></button>`;
+      <span><span class="t">${m.t}</span><span class="d">${esc(detail)}</span></span></button>`;
   }).join("") : "";
+  sayText = cmp ? `${whenSay(s)} 가셔야 해요. 뭐 타고 가실래요? ${cmp.reason} 추천은 ${MODE[cmp.recommended].t}예요.` : whenSay(s);
   shell(apptCard(s) + failed + `<p class="question">뭐 타고 가실래요?</p>
     ${cmp ? `<p class="p-reason">${esc(cmp.reason)}</p>` : ""}
     ${choices}
-    <p class="voice-hint">${ic("mic")}말로 해도 돼요: "택시", "버스", "아들이 태워줘"</p>
-    <button class="bigbtn ghost" id="say" type="button" data-voice="repeat">${ic("speaker")}소리로 듣기</button>` + upcomingList());
+    <p class="voice-hint">${ic("mic")}말로 해도 돼요: "택시", "버스", "아들이 태워줘"</p>` + upcomingList());
   for (const b of app.querySelectorAll(".choice")) {
     b.onclick = () => {
       const m = b.dataset.mode;
@@ -201,10 +244,6 @@ function render() {
       post("choose", { mode: m }, msg);
     };
   }
-  document.getElementById("say").onclick = () => {
-    if (!cmp) return;
-    speak(`${dayWord(new Date(s.start_at))} ${time.format(new Date(s.start_at))}에 ${s.place_name} 가셔야 해요. 뭐 타고 가실래요? ${cmp.reason} 추천은 ${MODE[cmp.recommended].t}예요.`);
-  };
 }
 
 // ---------------- 달력 (큰 글씨) ----------------
@@ -257,28 +296,29 @@ async function openCalendar(y, m) {
   }
   const selList = byDay.get(pcSel) || [];
   const selDate = new Date(pMidnight(pcSel).getTime() + 12 * 3600000);
-  app.innerHTML = `<div class="p-app">
-    <header class="p-top"><div class="p-top-row"><div class="p-date">달력</div>${micBtn()}</div>
-      <div class="pc-head">
-        <button type="button" class="pc-nav" id="prevM" data-voice="prev" aria-label="이전 달">${ic("chevron").replace("<svg", '<svg style="transform:scaleX(-1)"')}</button>
-        <div class="p-hello">${pcY !== Number(today.slice(0, 4)) ? `${pcY}년 ` : ""}${pcM}월</div>
-        <button type="button" class="pc-nav" id="nextM" data-voice="next" aria-label="다음 달">${ic("chevron")}</button>
-      </div>
-    </header>
-    <main class="p-main">
+  sayText = `${longDay.format(selDate)}. ${selList.length ? selList.map((s) => `${time.format(new Date(s.start_at))} ${s.place_name}`).join(", ") : "일정 없어요"}`;
+  frame({
+    sub: "달력",
+    title: `${pcY !== Number(today.slice(0, 4)) ? `${pcY}년 ` : ""}${pcM}월`,
+    main: `
       <div class="card pc">
+        <div class="pc-head">
+          <button type="button" class="round-btn" id="prevM" data-voice="prev" aria-label="이전 달">${ic("back")}</button>
+          <span class="p-hello">${pcM}월</span>
+          <button type="button" class="round-btn" id="nextM" data-voice="next" aria-label="다음 달">${ic("chevron")}</button>
+        </div>
         <div class="pc-grid pc-wd">${["일", "월", "화", "수", "목", "금", "토"].map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
         <div class="pc-grid" id="pcGrid">${weeks.join("")}</div>
       </div>
       <div class="card next-list">
         <h3>${esc(longDay.format(selDate))}</h3>
         ${selList.length ? selList.map((s) => `<div class="next-row"><span class="num">${esc(time.format(new Date(s.start_at)))}</span>
-            <span><b>${esc(s.place_name)}</b><br><span style="font-size:18px;color:var(--sub)">${esc(s.title)}${s.memo ? ` · ${esc(s.memo)}` : ""}</span></span></div>`).join("")
-          : `<div class="next-row" style="grid-template-columns:1fr;color:var(--sub)">이날은 일정이 없어요</div>`}
-      </div>
-      <button class="bigbtn" id="calBack" type="button" data-voice="back">돌아가기</button>
-    </main>
-  </div>`;
+            <span><b>${esc(s.place_name)}</b><small>${esc(s.title)}${s.memo ? ` · ${esc(s.memo)}` : ""}</small></span></div>`).join("")
+          : `<div class="next-row none">이날은 일정이 없어요</div>`}
+      </div>`,
+    bottom: `<button class="bigbtn" id="calBack" type="button" data-voice="back">${ic("back")}돌아가기</button>`,
+  });
+  app.querySelector(".p-bottom").classList.add("one");
   document.getElementById("calBack").onclick = backHome;
   document.getElementById("prevM").onclick = () => openCalendar(pcM === 1 ? pcY - 1 : pcY, pcM === 1 ? 12 : pcM - 1);
   document.getElementById("nextM").onclick = () => openCalendar(pcM === 12 ? pcY + 1 : pcY, pcM === 12 ? 1 : pcM + 1);
@@ -287,9 +327,7 @@ async function openCalendar(y, m) {
     if (!cell) return;
     pcSel = cell.dataset.day;
     const [yy, mm] = pcSel.split("-").map(Number);
-    openCalendar(yy, mm);
-    const n = (byDay.get(pcSel) || []).length;
-    speak(`${longDay.format(new Date(pMidnight(pcSel).getTime() + 12 * 3600000))}. ${n ? `일정 ${n}개` : "일정 없어요"}`);
+    openCalendar(yy, mm).then(() => speak(sayText));
   };
 }
 
@@ -303,9 +341,6 @@ const VOICE_WORD = {
   calendar: "달력", add: "일정 알려줄게", back: "돌아가", prev: "지난달", next: "다음 달", repeat: "다시 말해줘",
 };
 
-function micBtn(inModal = false) {
-  return `<button class="p-mic ${inModal ? "in-modal" : ""}" type="button" data-mic aria-label="말로 하기">${ic("mic")}<span>말하기</span></button>`;
-}
 
 function voiceRoot() {
   return document.querySelector(".modal-back") || app;
@@ -315,9 +350,13 @@ function voiceRoot() {
 function voiceExamples() {
   const root = voiceRoot();
   if (root.querySelector("[data-voice-any]")) return ["다음주 화요일 오전 10시 서울대병원", "돌아가"];
+  // 화면의 주된 행동을 먼저, 공통 버튼(다시 듣기·달력·일정)은 뒤에
+  const later = ["repeat", "calendar", "add", "back"];
+  const keys = [...root.querySelectorAll("[data-voice]")].map((b) => b.dataset.voice.split(" ")[0]);
+  keys.sort((a, b) => later.includes(a) - later.includes(b));
   const words = [];
-  for (const b of root.querySelectorAll("[data-voice]")) {
-    const w = VOICE_WORD[b.dataset.voice.split(" ")[0]];
+  for (const k of keys) {
+    const w = VOICE_WORD[k];
     if (w && !words.includes(w)) words.push(w);
   }
   return words.slice(0, 5);
@@ -377,7 +416,7 @@ function listen() {
   const typed = !Recognition;
   el.innerHTML = `<div class="card voice-card" role="dialog" aria-label="말로 하기">
     <div class="voice-orb ${typed ? "" : "on"}">${ic("mic")}</div>
-    <p class="question" id="vTitle" style="margin:0;text-align:center">${typed ? "말할 내용을 써 주세요" : "듣고 있어요"}</p>
+    <p class="question" id="vTitle">${typed ? "말할 내용을 써 주세요" : "듣고 있어요"}</p>
     <p class="voice-live" id="vLive">${typed ? (window.DEMO_NO_MIC ? "체험판 화면에서는 마이크를 쓸 수 없어서, 말할 내용을 글로 보내요." : "이 기기에서는 마이크를 쓸 수 없어요.") : "말씀이 끝나면 알아서 넘어가요"}</p>
     ${ex.length ? `<div class="voice-ex">${ex.map((w) => `<button type="button" class="chip" data-say="${esc(w)}">"${esc(w)}"</button>`).join("")}</div>` : ""}
     ${typed ? `<input id="vText" class="voice-input" placeholder="예) 택시" aria-label="말할 내용" /><button class="bigbtn" id="vSend" type="button">${ic("check")}보내기</button>` : ""}
@@ -441,19 +480,22 @@ function backHome() {
   load();
 }
 
-function inputShell(main) {
-  app.innerHTML = `<div class="p-app"><header class="p-top p-top-row"><div class="p-date">일정 알려주기</div>${micBtn()}</header><main class="p-main">${main}</main></div>`;
+function inputShell(main, bottom = "") {
+  frame({ title: "일정 알려주기", main, bottom });
+  const bar = app.querySelector(".p-bottom");
+  if (bar && bar.children.length === 1) bar.classList.add("one");
 }
 
 function openInput(message) {
   mode = "input";
+  sayText = "언제, 어디 가세요? 말하기 버튼을 누르고 말씀해 주세요. 예를 들면, 다음주 화요일 오전 10시 서울대병원.";
   inputShell(`
     <p class="question">언제, 어디 가세요?</p>
     <p class="p-reason">${esc(typeof message === "string" ? message : "예) 다음주 화요일 오전 10시 서울대병원")}</p>
-    <button class="bigbtn mic" type="button" data-mic>${ic("mic")}<span>눌러서 말하기</span></button>
-    <div class="p-input"><textarea id="txt" aria-label="일정 내용" placeholder="여기에 써도 돼요. 병원 문자를 붙여 넣어도 돼요."></textarea></div>
-    <button class="bigbtn" id="send" type="button" data-voice-any>${ic("check")}알려주기</button>
-    <button class="bigbtn ghost" id="back" type="button" data-voice="back">돌아가기</button>`);
+    <button class="bigbtn tall" type="button" data-mic>${ic("mic")}<span>눌러서 말하기</span></button>
+    <div class="p-input"><textarea id="txt" aria-label="일정 내용" placeholder="여기에 써도 돼요. 병원 문자를 붙여 넣어도 돼요."></textarea></div>`,
+  `<button class="bigbtn ghost" id="back" type="button" data-voice="back">${ic("back")}돌아가기</button>
+   <button class="bigbtn" id="send" type="button" data-voice-any>${ic("check")}알려주기</button>`);
   const txt = document.getElementById("txt");
   document.getElementById("back").onclick = backHome;
   document.getElementById("send").onclick = () => submitText(txt.value);
@@ -462,6 +504,7 @@ function openInput(message) {
 async function submitText(text) {
   if (!text.trim() || busy) return;
   busy = true;
+  mode = "input";
   inputShell(`<div class="card status"><div class="spinner"></div><h2>알아보는 중이에요</h2></div>`);
   try {
     const res = await fetch(`/api/p/${tok()}/parse`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
@@ -479,18 +522,19 @@ async function submitText(text) {
 function showConfirm(d) {
   const start = d.start_at ? new Date(d.start_at) : null;
   const t = start ? splitTime(start) : null;
+  sayText = `${start ? fullWhen.format(start) : "언제인지 모르겠어요"}, ${d.place_name || "어디인지 모르겠어요"}. 맞으세요?`;
   inputShell(`
     <p class="question">이거 맞아요?</p>
     <div class="card appt">
       ${start ? `<div class="appt-when"><span class="appt-day">${esc(dayWord(start))} ${esc(t.ampm)}</span><span class="num">${esc(t.hm)}</span></div>`
         : `<div class="appt-day">언제인지 모르겠어요</div>`}
       <div class="appt-place">${ic(d.kind) || ic("기타")}<span>${esc(d.place_name || "어디인지 모르겠어요")}</span></div>
-      <div class="appt-memo">${esc(start ? longDay.format(start) : "")}${d.memo ? ` · ${esc(d.memo)}` : ""}</div>
+      <div class="appt-meta"><span>${esc(start ? longDay.format(start) : "")}</span>${d.memo ? `<span class="tag memo">${esc(d.memo)}</span>` : ""}</div>
     </div>
-    ${start ? `<button class="bigbtn" id="yes" type="button" data-voice="yes">${ic("check")}맞아요</button>` : ""}
-    <button class="bigbtn ghost" id="again" type="button" data-voice="no">다시 할게요</button>
-    <p class="voice-hint">${ic("mic")}"맞아요" 또는 "아니요"라고 말해도 돼요</p>`);
-  speak(`${start ? fullWhen.format(start) : ""}, ${d.place_name || ""}. 맞으세요?`);
+    <p class="voice-hint">${ic("mic")}"맞아요" 또는 "아니요"라고 말해도 돼요</p>`,
+  `<button class="bigbtn ghost" id="again" type="button" data-voice="no">다시 할게요</button>
+   ${start ? `<button class="bigbtn" id="yes" type="button" data-voice="yes">${ic("check")}맞아요</button>` : ""}`);
+  speak(sayText);
   document.getElementById("again").onclick = () => openInput();
   const yes = document.getElementById("yes");
   if (yes) yes.onclick = () => acceptDraft(d, false);
@@ -504,6 +548,7 @@ async function acceptDraft(d, force) {
   if (res.status === 409) return showConflict(d, out.conflicts);
   if (!res.ok) return openInput(out.error || "다시 해 주세요");
   const msg = out.handedToGuardian ? "자녀에게 장소 확인을 부탁했어요" : "일정을 넣었어요";
+  sayText = msg;
   inputShell(`<div class="card status"><div class="big-ic ok">${ic("check")}</div><h2>${msg}</h2><p>그날 아침에 알려 드릴게요.</p></div>`);
   speak(msg);
   setTimeout(backHome, 2500);
@@ -519,15 +564,14 @@ function showConflict(d, conflicts) {
   const modal = document.createElement("div");
   modal.className = "modal-back";
   modal.innerHTML = `<div class="card" role="alertdialog" aria-label="${esc(title)}">
-    <div class="row" style="gap:12px"><span class="big-ic" style="width:56px;height:56px;font-size:30px;border-radius:50%;display:grid;place-items:center;background:var(--warn-soft);color:var(--warn)">${ic("warn")}</span>
-      <p class="question" style="margin:0;font-size:26px;flex:1">${title}</p></div>
-    <div class="card appt" style="box-shadow:none;background:var(--bg)">
-      <div class="appt-when"><span class="appt-day">${esc(dayWord(when))} ${esc(t.ampm)}</span><span class="num" style="font-size:38px">${esc(t.hm)}</span></div>
-      <div class="appt-place" style="font-size:26px">${esc(c.place_name)}</div>
+    <div class="modal-title"><span class="big-ic sm warn">${ic("warn")}</span><p class="question">${title}</p></div>
+    <div class="card sunk appt">
+      <div class="appt-when"><span class="appt-day">${esc(dayWord(when))} ${esc(t.ampm)}</span><span class="num">${esc(t.hm)}</span></div>
+      <div class="appt-place">${esc(c.place_name)}</div>
     </div>
     <button class="bigbtn" id="cNo" type="button" data-voice="no">안 넣을게요</button>
     <button class="bigbtn ghost" id="cYes" type="button" data-voice="yes">그래도 넣을게요</button>
-    ${micBtn(true)}
+    <button class="bigbtn dark" type="button" data-mic>${ic("mic")}말로 대답하기</button>
   </div>`;
   (document.querySelector(".big") || document.body).appendChild(modal);
   speak(`${title}. ${fullWhen.format(when)} ${c.place_name}. 그래도 넣을까요?`);

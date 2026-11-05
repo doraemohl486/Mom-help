@@ -94,10 +94,10 @@ function askConflict(conflicts) {
   const dup = conflicts.some((c) => c.type === "duplicate");
   $("#conflictTitle").textContent = dup ? "이미 같은 일정이 있어요" : "시간이 겹치는 일정이 있어요";
   $("#conflictList").innerHTML = conflicts.map((c) => `
-    <div class="card row" style="box-shadow:none">
+    <div class="card flat row nowrap">
       <span class="pill ${c.type === "duplicate" ? "bad" : "warn"}">${c.type === "duplicate" ? "같은 일정" : "2시간 안"}</span>
       <div><b>${fmt.format(new Date(c.start_at))}</b><br><span class="muted">${esc(c.place_name)}${c.title ? ` · ${esc(c.title)}` : ""}</span></div>
-    </div>`).join("") + `<p class="muted" style="margin:0">${dup ? "같은 예약이 두 번 들어간 것 같아요." : "이동 시간이 빠듯할 수 있어요."}</p>`;
+    </div>`).join("") + `<p class="muted">${dup ? "같은 예약이 두 번 들어간 것 같아요." : "이동 시간이 빠듯할 수 있어요."}</p>`;
   dlg.showModal();
   return new Promise((resolve) => {
     $("#conflictForce").onclick = () => { dlg.close(); resolve(true); };
@@ -192,7 +192,7 @@ function render() {
     ? [...groups.entries()].map(([k, list]) => `
         <div class="day"><div class="day-label">${dayName(k, new Date(list[0].start_at))}</div>
           ${list.map((s) => scheduleCard(s, byId[s.parent_id], false)).join("")}</div>`).join("")
-      + (done.length ? `<details class="more"><summary>끝난 일정 ${done.length}개</summary><div class="stack" style="margin-top:8px">${done.map((s) => scheduleCard(s, byId[s.parent_id], false)).join("")}</div></details>` : "")
+      + (done.length ? `<details class="more"><summary>끝난 일정 ${done.length}개</summary><div class="stack">${done.map((s) => scheduleCard(s, byId[s.parent_id], false)).join("")}</div></details>` : "")
     : (parents.length && !nowList.length ? `<div class="card empty"><b>등록된 일정이 없어요</b>아래 노란 + 버튼으로 추가하거나, 병원 예약 문자를 붙여 넣어 보세요.</div>` : "");
 
   // 알림
@@ -209,12 +209,11 @@ function render() {
   // 가족
   $("#parents").innerHTML = parents.map((p, i) => `
     <div class="card parent-card">
-      <span class="avatar a${i % 3}">${esc(p.name.slice(-1))}</span>
-      <div>
-        <div class="row between"><b style="font-size:17px">${esc(p.name)}${p.real_name ? ` <span class="muted">(${esc(p.real_name)})</span>` : ""}</b><span class="muted">${esc(p.phone)}</span></div>
-        <div class="muted">${esc(p.home_address)}</div>
-        ${p.notes ? `<div class="muted">참고: ${esc(p.notes)}</div>` : ""}
-        <div class="row" style="margin-top:10px">
+      <span class="avatar lg a${i % 3}">${esc(p.name.slice(-1))}</span>
+      <div class="stack tight">
+        <div class="row between"><span class="parent-name">${esc(p.name)}${p.real_name ? ` <span class="muted">(${esc(p.real_name)})</span>` : ""}</span><span class="muted">${esc(p.phone)}</span></div>
+        <div class="muted">${esc(p.home_address)}${p.notes ? `<br>참고: ${esc(p.notes)}` : ""}</div>
+        <div class="row">
           <a class="btn small primary" href="/p/${esc(p.token)}" target="_blank">${esc(p.name)} 화면 열기</a>
           <button class="btn small" type="button" onclick="copyLink('${esc(p.token)}')">링크 복사</button>
         </div>
@@ -251,19 +250,17 @@ function renderCalendar(byId, nowList) {
       i % 7 === 0 ? "sun" : i % 7 === 6 ? "sat" : "",
     ].join(" ");
     const dots = list.slice(0, 3).map((s) => `<i class="dot-p a${(byId[s.parent_id]?.idx ?? 0) % 3}"></i>`).join("");
-    const evs = list.slice(0, 2).map((s) => `<span class="cal-ev a${(byId[s.parent_id]?.idx ?? 0) % 3}">${esc(splitTime(new Date(s.start_at)).hm)} ${esc(s.place_name)}</span>`).join("");
     cells.push(`<button type="button" class="cal-cell ${cls}" data-day="${k}" aria-label="${esc(k)} 일정 ${list.length}개">
       <span class="cal-num">${dd}</span>
       <span class="cal-dots">${dots}${list.length > 3 ? `<b>+${list.length - 3}</b>` : ""}</span>
-      <span class="cal-evs">${evs}${list.length > 2 ? `<span class="cal-more">+${list.length - 2}</span>` : ""}</span>
     </button>`);
   }
   $("#calBox").innerHTML = `
     <div class="cal-head">
-      <button type="button" class="btn small ghost" data-nav="-1" aria-label="이전 달">${ic("chevron").replace("<svg", '<svg style="transform:scaleX(-1)"')}</button>
+      <button type="button" class="btn small ghost icon" data-nav="-1" aria-label="이전 달">${ic("back")}</button>
       <b class="cal-title">${calY}년 ${calM}월</b>
-      <button type="button" class="btn small ghost" data-nav="1" aria-label="다음 달">${ic("chevron")}</button>
-      <button type="button" class="btn small" data-nav="0" style="margin-left:auto">오늘</button>
+      <button type="button" class="btn small ghost icon" data-nav="1" aria-label="다음 달">${ic("chevron")}</button>
+      <button type="button" class="btn small push" data-nav="0">오늘</button>
     </div>
     <div class="cal-grid cal-wd">${["일", "월", "화", "수", "목", "금", "토"].map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
     <div class="cal-grid">${cells.join("")}</div>
@@ -276,7 +273,7 @@ function renderCalendar(byId, nowList) {
   const title = `${selDay === tKey ? "오늘 · " : ""}${fmtDay.format(sel)}`;
   $("#dayBox").innerHTML = `<div class="day-label">${esc(title)}</div>` + (dayList.length
     ? dayList.map((s) => scheduleCard(s, byId[s.parent_id], false)).join("")
-    : `<div class="card empty" style="padding:18px"><b>${(byDay.get(selDay) || []).length ? "위에 보이는 일정뿐이에요" : "이날은 일정이 없어요"}</b>
+    : `<div class="card empty"><b>${(byDay.get(selDay) || []).length ? "위에 보이는 일정뿐이에요" : "이날은 일정이 없어요"}</b>
         <button type="button" class="btn small" onclick="openScheduleDialog(undefined, '${selDay}')" ${selDay < tKey ? "hidden" : ""}>${ic("plus")}이날 일정 추가</button></div>`);
 }
 
@@ -320,7 +317,7 @@ function steps(s) {
     scheduled: 0, asked: 1, escalated: 1, chosen: 2, taxi_reserved: 2, calling: 2, call_failed: 2, dispatched: 3, arrived: names.length,
   }[s.status] ?? 0;
   const sent = (s.stages_sent || []).length > 0 || s.status !== "scheduled";
-  return `<div class="steps" style="grid-template-columns:repeat(${names.length},1fr)">${names.map((n, i) => {
+  return `<div class="steps">${names.map((n, i) => {
     let cls = i < at ? "done" : i === at ? "now" : "";
     if (i === 0 && sent && at === 0) cls = "now";
     if (s.status === "call_failed" && i === 2) cls = "bad";
@@ -334,7 +331,7 @@ function modesBlock(s) {
   if (!cmp) return "";
   const can = !["calling", "dispatched", "arrived", "cancelled"].includes(s.status);
   const est = cmp.options.some((o) => o.source === "estimate");
-  return `<div>
+  return `<div class="stack tight">
     <div class="modes">${cmp.options.map((o) => `
       <button type="button" class="mode ${o.mode === cmp.recommended ? "rec" : ""} ${s.chosen_mode === o.mode ? "chosen" : ""}" ${can ? "" : "disabled"} onclick="choose(${s.id}, '${o.mode}')">
         <span class="m-name">${ic(MODE[o.mode].icon)}${MODE[o.mode].name}</span>
@@ -342,7 +339,7 @@ function modesBlock(s) {
         <span class="m-sub">${o.costWon ? `${o.costWon.toLocaleString()}원` : "비용 없음"}${o.walkMeters ? ` · 걷기 ${o.walkMeters}m` : ""}</span>
       </button>`).join("")}
     </div>
-    <p class="reason" style="margin-top:8px">${esc(cmp.reason)}${est ? " (거리로 추정한 값)" : ""}</p>
+    <p class="reason">${esc(cmp.reason)}${est ? " (거리로 추정한 값)" : ""}</p>
   </div>`;
 }
 
@@ -357,26 +354,26 @@ function scheduleCard(s, p, hero) {
 
   const banners = [];
   if (s.status === "escalated") {
-    banners.push(`<div class="banner-warn">${ic("warn")}<span><b>${esc(p?.name ?? "")}</b> 답이 없으세요. 대신 골라 주세요.</span></div>`);
+    banners.push(`<div class="note warn">${ic("warn")}<span><b>${esc(p?.name ?? "")}</b> 답이 없으세요. 대신 골라 주세요.</span></div>`);
   }
   if (s.status === "taxi_reserved" && s.taxi_call_at) {
-    banners.push(`<div class="banner-ok">${ic("clock")}<span><b class="num" style="font-size:18px">${fmtTime.format(new Date(s.taxi_call_at))}</b>에 AI 비서가 택시를 불러요</span>
-      <button class="btn small dark" type="button" onclick="callNow(${s.id})" style="margin-left:auto">지금 바로 부르기</button></div>`);
+    banners.push(`<div class="note ok">${ic("clock")}<span><b>${fmtTime.format(new Date(s.taxi_call_at))}</b>에 AI 비서가 택시를 불러요</span>
+      <button class="btn small dark push" type="button" onclick="callNow(${s.id})">지금 바로 부르기</button></div>`);
   }
   if (s.status === "calling") {
-    banners.push(`<div class="banner-ok" style="background:var(--brand-soft)">${ic("phone")}<span>AI 비서가 동행 온다콜택시와 통화하고 있어요${call && call.attempt > 1 ? ` (${call.attempt}번째)` : ""}</span></div>`);
+    banners.push(`<div class="note brand">${ic("phone")}<span>AI 비서가 동행 온다콜택시와 통화하고 있어요${call && call.attempt > 1 ? ` (${call.attempt}번째)` : ""}</span></div>`);
   }
   if (call && call.status === "dispatched") {
-    banners.push(`<div class="banner-ok">${ic("taxi")}<span class="plate-sm">${esc(call.car_number)}</span><span>${esc(call.car_description || "")}${call.eta_minutes ? ` · <b>${call.eta_minutes}분</b> 뒤 도착` : ""}</span></div>`);
+    banners.push(`<div class="note ok">${ic("taxi")}<span class="plate-sm">${esc(call.car_number)}</span><span>${esc(call.car_description || "")}${call.eta_minutes ? ` · <b>${call.eta_minutes}분</b> 뒤 도착` : ""}</span></div>`);
   }
   if (bad) {
-    banners.push(`<div class="banner-bad">${ic("warn")}<span>택시를 못 불렀어요. 카카오T '대신 불러주기'나 1855-0120으로 불러 주세요.</span></div>`);
+    banners.push(`<div class="note bad">${ic("warn")}<span>택시를 못 불렀어요. 카카오T '대신 불러주기'나 1855-0120으로 불러 주세요.</span></div>`);
   }
 
   const transcript = call ? `
     <details class="more" ${openTranscripts.has(s.id) ? "open" : ""} ontoggle="toggleTranscript(${s.id}, this.open)">
       <summary>AI 통화 내용 ${call.transcript.length}줄</summary>
-      <div class="transcript" style="margin-top:8px">${call.transcript.map((x) => `<p><span class="who-${x.who}">${x.who === "ai" ? "AI 비서" : "콜센터"}</span> ${esc(x.text)}</p>`).join("")}</div>
+      <div class="transcript">${call.transcript.map((x) => `<p><span class="who-${x.who}">${x.who === "ai" ? "AI 비서" : "콜센터"}</span> ${esc(x.text)}</p>`).join("")}</div>
     </details>` : "";
 
   const body = open ? `
@@ -389,7 +386,7 @@ function scheduleCard(s, p, hero) {
         ${SOURCE[s.source] ? `<span>${ic(s.source === "sms" ? "sms" : "users")}${SOURCE[s.source]}</span>` : ""}
       </div>
       ${["dispatched", "arrived", "cancelled"].includes(s.status) ? "" : modesBlock(s)}
-      ${s.events.length ? `<details class="more"><summary>진행 기록 ${s.events.length}개</summary><ul class="timeline" style="margin-top:8px">${s.events.map((e) => `<li><time>${fmtTime.format(new Date(e.created_at))}</time><span>${esc(e.message)}</span></li>`).join("")}</ul></details>` : ""}
+      ${s.events.length ? `<details class="more"><summary>진행 기록 ${s.events.length}개</summary><ul class="timeline">${s.events.map((e) => `<li><time>${fmtTime.format(new Date(e.created_at))}</time><span>${esc(e.message)}</span></li>`).join("")}</ul></details>` : ""}
       ${transcript}
       <div class="actions">
         ${["scheduled", "call_failed", "escalated", "taxi_reserved"].includes(s.status) ? `<button class="btn small" type="button" onclick="askNow(${s.id})">${ic("bell")}지금 물어보기 (데모)</button>` : ""}
@@ -418,11 +415,11 @@ function draftCard(d, p) {
     ...d.conflicts.map((c) => `<span class="pill warn">${c.type === "duplicate" ? "같은 일정 있음" : "겹치는 일정"} · ${fmtTime.format(new Date(c.start_at))} ${esc(c.place_name)}</span>`),
   ].join(" ");
   return `
-  <div class="card stripe-warn stack" style="gap:8px">
+  <div class="card stripe-warn stack tight">
     <div class="row between"><b>${esc(p?.name ?? "")} · ${esc(when)}</b><span class="pill">${ic(d.source === "sms" ? "sms" : "users")}${SOURCE[d.source] || "직접 입력"}</span></div>
     <div>${esc(d.title)} · ${esc(d.place_name || "장소를 모르겠어요")}${d.memo ? ` <span class="muted">· ${esc(d.memo)}</span>` : ""}</div>
     ${warn ? `<div class="row">${warn}</div>` : ""}
-    <details class="more"><summary>받은 내용</summary><div class="transcript" style="margin-top:6px">${esc(d.raw_text)}</div></details>
+    <details class="more"><summary>받은 내용</summary><div class="transcript">${esc(d.raw_text)}</div></details>
     <div class="actions">
       ${d.missing.length ? "" : `<button class="btn small primary" type="button" onclick="acceptDraft(${d.id})">저장</button>`}
       <button class="btn small" type="button" onclick="editDraft(${d.id})">고쳐서 저장</button>
@@ -432,16 +429,16 @@ function draftCard(d, p) {
 }
 
 function inboxHelp(parents) {
-  return `<p class="muted" style="margin-top:0">부모님 폰에 온 병원 예약 문자를 이 주소로 넘기면 일정이 알아서 생겨요. 같은 예약 문자가 또 오면 건너뛰고, 애매하면 '확인이 필요해요'에 올려요.</p>`
+  return `<p class="muted">부모님 폰에 온 병원 예약 문자를 이 주소로 넘기면 일정이 알아서 생겨요. 같은 예약 문자가 또 오면 건너뛰고, 애매하면 '확인이 필요해요'에 올려요.</p>`
     + parents.map((p) => {
       const url = `${location.origin}/api/inbox/${p.token}`;
-      return `<div class="stack" style="gap:6px;margin-bottom:12px"><b>${esc(p.name)} 폰</b><div class="mono">${esc(url)}</div>
+      return `<div class="stack tight"><b>${esc(p.name)} 폰</b><div class="mono">${esc(url)}</div>
         <div><button class="btn small" type="button" onclick="copyText('${esc(url)}')">주소 복사</button></div></div>`;
     }).join("") + `
-    <details class="more"><summary>폰 설정 방법</summary>
+    <details class="more"><summary>폰 설정 방법</summary><div class="stack tight">
       <p class="muted"><b>아이폰</b> · 단축어 → 자동화 → 메시지 → '예약' 또는 '진료' 포함 → 즉시 실행 → 'URL 콘텐츠 가져오기'에 위 주소, 방법 POST, 본문에 '메시지'</p>
       <p class="muted"><b>안드로이드</b> · 문자 웹훅 전달 앱에서 '예약'이 들어간 문자를 위 주소로 POST</p>
-    </details>`;
+    </div></details>`;
 }
 
 // ---------------------------------------------------------------- 동작
@@ -508,7 +505,7 @@ function showView(name) {
     seenNotif = state.notifications[0]?.id ?? 0;
     $("#alertDot").hidden = true;
   }
-  ($("#gApp").closest(".pane") || window).scrollTo?.(0, 0);
+  $("#gMain").scrollTo(0, 0);
 }
 $("#gTabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-view]");
@@ -684,5 +681,9 @@ $("#scenario").addEventListener("click", async (e) => {
 });
 
 paintIcons();
-refresh(true);
+// 시작 화면: 첫 데이터를 받고, 최소 0.9초는 보여 준 뒤 사라짐
+const splashStart = Date.now();
+refresh(true).finally(() => {
+  setTimeout(() => $("#gSplash")?.classList.add("done"), Math.max(0, 1200 - (Date.now() - splashStart)));
+});
 setInterval(refresh, 2500);

@@ -13,6 +13,7 @@
     for (const p of document.querySelectorAll(".pane")) p.classList.toggle("on", p.id === `pane-${name}`);
     window.scrollTo(0, 0);
   }
+  // 탭 글자는 짧게 (폰 너비에 맞게)
   q("#tabs").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (b) showTab(b.dataset.tab);
@@ -70,7 +71,7 @@
     q("#clock").textContent = demo.clockText();
     q("#next").textContent = demo.nextText();
     const n = demo.now();
-    q("#phoneClock").textContent = new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(n);
+    if (q("#phoneClock")) q("#phoneClock").textContent = new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(n);
   }
   q("#skipBtn").onclick = async () => {
     const label = await demo.skip();
