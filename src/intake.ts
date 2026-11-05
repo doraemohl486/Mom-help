@@ -40,6 +40,11 @@ export type NewSchedule = Pick<
 /** 누가 보는 화면인지: 자녀에게는 부모님만 보는 일정을 감춘다 */
 export type Viewer = "parent" | "guardian";
 
+/** 자녀에게 보일지: 병원 일정과 자녀가 넣은 일정만. 부모님이 넣은 모임·장보기 등은 부모님만 (묻지 않음) */
+export function isSharedByRule(kind: string, source: ScheduleSource): boolean {
+  return kind === "병원" || source !== "parent";
+}
+
 const norm = (s: string) => s.replace(/\s|\(.*?\)/g, "");
 
 export function samePlace(a: string, b: string): boolean {
@@ -88,7 +93,7 @@ export class Intake {
 
   /** 일정 저장 (겹치는 일정이 있으면 force 없이는 ConflictError). 병원 일정은 늘 자녀에게 보임 */
   async createSchedule(input: NewSchedule, force = false, viewer: Viewer = "parent"): Promise<Schedule> {
-    if (input.kind === "병원" || input.source === "sms" || input.source === "guardian" || input.source === undefined) input = { ...input, shared: true };
+    input = { ...input, shared: isSharedByRule(input.kind, input.source ?? "guardian") };
     const conflicts = this.findConflicts(input.parent_id, input.start_at, input.place_name, null, viewer);
     if (conflicts.length && !force) throw new ConflictError(conflicts);
     const s = this.db.createSchedule(input);
@@ -134,19 +139,18 @@ export class Intake {
       ...d,
       missing: this.missingFields(d),
       conflicts: d.start_at ? this.findConflicts(d.parent_id, d.start_at, d.place_name, null, viewer) : [],
-      /** 부모님께 "자녀에게도 보여줄까요?"를 물어야 하는지 (병원은 늘 보임) */
-      ask_share: d.source === "parent" && d.kind !== "병원",
     };
   }
 
   /**
    * 임시 일정을 실제 일정으로 저장.
-   * shared=false (부모님이 "나만 볼게요"): 장소 위치를 못 찾았으면 자녀에게 넘기지 않고 대략 위치로 저장
+   * 보여주기 규칙(묻지 않음): 병원 일정·자녀가 넣은 일정은 자녀에게 보이고, 부모님이 넣은 다른 일정은 부모님만.
+   * 부모님만 보는 일정은 장소 위치를 못 찾아도 자녀에게 넘기지 않고 대략 위치로 저장한다.
    */
-  async acceptDraft(draftId: number, force = false, opts: { shared?: boolean; viewer?: Viewer } = {}): Promise<Schedule> {
+  async acceptDraft(draftId: number, force = false, opts: { viewer?: Viewer } = {}): Promise<Schedule> {
     const d = this.db.getDraft(draftId);
     if (!d || (d.status !== "pending" && d.status !== "review")) throw new Error("이미 처리된 일정이에요.");
-    const shared = d.kind === "병원" || d.source !== "parent" ? true : opts.shared !== false;
+    const shared = isSharedByRule(d.kind, d.source);
     if (!shared && d.place_name && (d.place_lat === null || d.place_lng === null)) {
       const approx = approxPlace(d.place_name) ?? { lat: 37.5665, lng: 126.978 };
       d.place_lat = approx.lat;

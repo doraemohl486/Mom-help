@@ -354,7 +354,7 @@ test("자동 가져오기는 병원 예약 문자만: 모임·경조사 문자�
   assert.equal(pasted?.kind, "모임");
 });
 
-test("부모님만 보는 일정: 자녀 화면·달력에 안 보이고, 겹침은 '다른 일정'으로만, 알림은 장소 없이", async () => {
+test("부모님이 넣은 병원 외 일정은 묻지 않고 부모님만: 자녀 화면·달력에 안 보이고, 겹침은 '다른 일정'으로만, 알림은 장소 없이", async () => {
   const { svc, parent, sched } = setup();
   const app = createApp(svc);
   const server = app.listen(0);
@@ -362,10 +362,10 @@ test("부모님만 보는 일정: 자녀 화면·달력에 안 보이고, 겹침
   const post = (url: string, body: unknown) =>
     fetch(base + url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   try {
-    // 부모님이 말로 알려 준 모임 → "나만 볼게요"
+    // 부모님이 말로 알려 준 모임 → 묻지 않고 부모님만
     const draft = await (await post(`/api/p/${parent.token}/parse`, { text: "11월 13일 낮 12시 종로구 탑골공원 동창 모임" })).json();
-    assert.equal(draft.ask_share, true);
-    const ok = await (await post(`/api/p/${parent.token}/drafts/${draft.id}/accept`, { shared: false })).json();
+    assert.equal(draft.ask_share, undefined, "보여줄지 묻지 않음");
+    const ok = await (await post(`/api/p/${parent.token}/drafts/${draft.id}/accept`, {})).json();
     assert.equal(ok.shared, false);
     const privateId = ok.scheduleId;
 
@@ -398,11 +398,15 @@ test("부모님만 보는 일정: 자녀 화면·달력에 안 보이고, 겹침
     assert.doesNotMatch(alert.message, /탑골|모임|종로/);
     assert.equal(alert.schedule_id, null);
 
-    // 병원 일정은 물어보지 않고 늘 자녀에게 보임
+    // 병원 일정은 부모님이 넣어도 늘 자녀에게 보임
     const hosp = await (await post(`/api/p/${parent.token}/parse`, { text: "11월 25일 오전 9시 서울성모병원 안과" })).json();
-    assert.equal(hosp.ask_share, false);
-    const h = await (await post(`/api/p/${parent.token}/drafts/${hosp.id}/accept`, { shared: false })).json();
+    const h = await (await post(`/api/p/${parent.token}/drafts/${hosp.id}/accept`, {})).json();
     assert.equal(h.shared, true);
+    // 자녀가 넣은 모임은 자녀에게 보임
+    const g = await post("/api/schedules", {
+      parent_id: parent.id, title: "가족 점심", place_name: "서울역", place_address: "서울", place_lat: 37.55, place_lng: 126.97, start_local: "2026-11-28T12:00",
+    });
+    assert.equal((await g.json()).shared, 1);
   } finally {
     server.close();
   }

@@ -558,34 +558,17 @@ function showConfirm(d) {
   speak(sayText);
   document.getElementById("again").onclick = () => openInput();
   const yes = document.getElementById("yes");
-  if (yes) yes.onclick = () => (d.ask_share ? askShare(d) : acceptDraft(d, false, true));
+  if (yes) yes.onclick = () => acceptDraft(d, false);
 }
 
-/** 병원이 아닌 일정: 자녀에게도 보여줄지 한 번 묻기 (버튼 2개, 말로 대답 가능) */
-function askShare(d) {
-  sayText = "자녀에게도 보여줄까요? 보여주면 자녀 달력에도 나와요. 안 보여주면 내 폰에만 있어요.";
-  inputShell(`
-    <p class="question">자녀에게도 보여줄까요?</p>
-    <div class="card status">
-      <div class="big-ic ok">${ic("users")}</div>
-      <p>보여주면 자녀 달력에도 나와요.<br>안 보여주면 <b>내 폰에만</b> 있어요.</p>
-    </div>
-    <p class="voice-hint">${ic("mic")}"보여줘" 또는 "나만 볼게"라고 말해도 돼요</p>`,
-  `<button class="bigbtn ghost" id="mineOnly" type="button" data-voice="no">🔒 나만 볼게요</button>
-   <button class="bigbtn" id="shareYes" type="button" data-voice="yes">${ic("check")}보여줄게요</button>`);
-  speak(sayText);
-  document.getElementById("shareYes").onclick = () => acceptDraft(d, false, true);
-  document.getElementById("mineOnly").onclick = () => acceptDraft(d, false, false);
-}
-
-async function acceptDraft(d, force, shared = true) {
+async function acceptDraft(d, force) {
   const res = await fetch(`/api/p/${tok()}/drafts/${d.id}/accept`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force, shared }),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force }),
   });
   const out = await res.json().catch(() => ({}));
-  if (res.status === 409) return showConflict(d, out.conflicts, shared);
+  if (res.status === 409) return showConflict(d, out.conflicts);
   if (!res.ok) return openInput(out.error || "다시 해 주세요");
-  const msg = out.handedToGuardian ? "자녀에게 장소 확인을 부탁했어요" : out.shared === false ? "내 폰에만 넣었어요" : "일정을 넣었어요";
+  const msg = out.handedToGuardian ? "자녀에게 장소 확인을 부탁했어요" : "일정을 넣었어요";
   sayText = msg;
   inputShell(`<div class="card status"><div class="big-ic ok">${ic("check")}</div><h2>${msg}</h2><p>그날 아침에 알려 드릴게요.</p></div>`);
   speak(msg);
@@ -593,7 +576,7 @@ async function acceptDraft(d, force, shared = true) {
 }
 
 /** 중복·겹치는 일정 팝업 (큰 글씨, 버튼 2개) */
-function showConflict(d, conflicts, shared = true) {
+function showConflict(d, conflicts) {
   const dup = conflicts.some((c) => c.type === "duplicate");
   const c = conflicts[0];
   const title = dup ? "이미 같은 일정이 있어요" : "가까운 시간에 다른 일정이 있어요";
@@ -620,7 +603,7 @@ function showConflict(d, conflicts, shared = true) {
   };
   modal.querySelector("#cYes").onclick = () => {
     modal.remove();
-    acceptDraft(d, true, shared);
+    acceptDraft(d, true);
   };
 }
 

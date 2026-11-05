@@ -73,7 +73,7 @@ function seed() {
   const s2 = db.createSchedule({
     parent_id: p.id, title: "초등학교 동창 모임", kind: "모임", place_name: "종로구 탑골공원", place_address: "서울 종로구 종로 99",
     place_lat: 37.5711, place_lng: 126.9882, start_at: fromSeoulLocal(`${sat}T12:00`).toISOString(), memo: "회비 3만 원",
-    source: "parent", shared: false, // 엄마가 "나만 볼게요"를 고른 일정: 자녀 화면에는 안 보임
+    source: "parent", shared: false, // 엄마가 넣은 모임: 자녀 화면에는 안 보임
   });
   void flow.plan(s.id).then(() => flow.plan(s2.id)).then(() => flow.tickOne(s.id)).then(save);
 }

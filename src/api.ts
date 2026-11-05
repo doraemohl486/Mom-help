@@ -275,13 +275,12 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
   r("POST", "/api/p/:token/drafts/:id/accept", async (req) => {
     const own = ownDraft(req);
     if (!own) return reply(404, { error: "일정을 찾을 수 없어요." });
-    const shared = req.body?.shared !== false; // "나만 볼게요"면 false
     try {
-      const s = await intake.acceptDraft(own.d.id, req.body?.force === true, { shared });
+      const s = await intake.acceptDraft(own.d.id, req.body?.force === true);
       return reply(200, { ok: true, scheduleId: s.id, shared: s.shared === 1 });
     } catch (err) {
-      // 장소를 못 찾았으면 자녀에게 넘김 (자녀에게 보여주기로 한 일정만)
-      if (shared && err instanceof IncompleteError && !err.missing.includes("날짜·시간")) {
+      // 병원 일정인데 장소를 못 찾았으면 자녀에게 넘김 (개인 일정은 대략 위치로 이미 저장됨)
+      if (err instanceof IncompleteError && !err.missing.includes("날짜·시간")) {
         intake.handToGuardian(own.d.id);
         return reply(200, { ok: true, handedToGuardian: true });
       }
