@@ -448,3 +448,5 @@ details.more > summary { cursor: pointer; color: var(--sub); font-size: var(--t2
 .avatar-edit { position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--surface); display: grid; place-items: center; font-size: 12px; border: 2px solid var(--surface); }
 
 .hello-face { font-size: 1.15em; margin-right: var(--s1); }
+
+.tag.lock { background: var(--bg); color: var(--sub); }

@@ -55,21 +55,22 @@ export function openMemDb(initial?: Tables): { db: Db; dump: () => Tables } {
 
     createSchedule(s: Parameters<Db["createSchedule"]>[0]): Schedule {
       const row: Schedule = {
-        ...s, source: s.source ?? "guardian", id: id(), status: "scheduled", chosen_mode: null, route_options: null,
+        ...s, source: s.source ?? "guardian", shared: s.shared === false ? 0 : 1, id: id(), status: "scheduled", chosen_mode: null, route_options: null,
         departure_at: null, stages_sent: "[]", taxi_call_at: null, created_at: now(),
       };
       t.schedules.push(row);
       return { ...row };
     },
     getSchedule: (sid: number) => copy(t.schedules.find((x) => x.id === sid)),
-    listSchedules: (fromIso: string) => t.schedules.filter((s) => s.start_at >= fromIso).sort(byStart).map((s) => ({ ...s })),
+    listSchedules: (fromIso: string) => t.schedules.filter((s) => s.start_at >= fromIso && s.shared !== 0).sort(byStart).map((s) => ({ ...s })),
     listSchedulesForParent: (pid: number, fromIso: string) =>
       t.schedules.filter((s) => s.parent_id === pid && s.start_at >= fromIso && s.status !== "cancelled").sort(byStart).map((s) => ({ ...s })),
     listActiveSchedules: (fromIso: string, toIso: string) =>
       t.schedules.filter((s) => s.start_at >= fromIso && s.start_at <= toIso && !["cancelled", "arrived"].includes(s.status))
         .sort(byStart).map((s) => ({ ...s })),
     listSchedulesBetween: (fromIso: string, toIso: string, pid: number | null = null) =>
-      t.schedules.filter((s) => s.start_at >= fromIso && s.start_at < toIso && s.status !== "cancelled" && (pid === null || s.parent_id === pid))
+      t.schedules.filter((s) => s.start_at >= fromIso && s.start_at < toIso && s.status !== "cancelled"
+        && (pid === null ? s.shared !== 0 : s.parent_id === pid))
         .sort(byStart).map((s) => ({ ...s })),
     updateSchedule(sid: number, fields: Partial<Omit<Schedule, "id">>) {
       const row = t.schedules.find((x) => x.id === sid);

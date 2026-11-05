@@ -100,7 +100,7 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
       parents: db.listParents().map(parentPublic),
       schedules: db.listSchedules(since()).map(scheduleView),
       notifications: db.listNotifications("guardian", null),
-      drafts: db.listReviewDrafts().map((d) => intake.draftView(d)),
+      drafts: db.listReviewDrafts().map((d) => intake.draftView(d, "guardian")),
       callProvider: calls.provider.name,
       simulatorScenario: simulator?.scenario ?? null,
     });
@@ -135,11 +135,19 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
     const draft = draft_id ? db.getDraft(draft_id) : undefined;
     const kind = rest.kind || guessKind(`${rest.title} ${rest.place_name}`);
     const s = await intake.createSchedule(
-      { ...rest, kind, start_at: fromSeoulLocal(start_local).toISOString(), source: draft?.source ?? "guardian" }, force);
+      { ...rest, kind, start_at: fromSeoulLocal(start_local).toISOString(), source: draft?.source ?? "guardian" }, force, "guardian");
     if (draft) db.updateDraft(draft.id, { status: "accepted", schedule_id: s.id });
     return reply(201, scheduleView(s));
   });
+  // 자녀 화면에서 다루는 일정: 부모님만 보는 일정은 없는 것처럼
+  const sharedSchedule = (req: ApiRequest) => {
+    const s = db.getSchedule(Number(req.params.id));
+    return s && s.shared !== 0 ? s : null;
+  };
+  const notFound = () => reply(404, { error: "일정을 찾을 수 없어요." });
+
   r("POST", "/api/schedules/:id/call-now", async (req) => {
+    if (!sharedSchedule(req)) return notFound();
     await flow.callTaxiNow(Number(req.params.id));
     return reply(200, scheduleView(db.getSchedule(Number(req.params.id))!));
   });
@@ -151,10 +159,10 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
     if (!db.getParent(parentId)) return reply(400, { error: "누구 일정인지 골라 주세요." });
     const d = await intake.draftFromText(parentId, text, "guardian");
     if (!d) return reply(422, { error: "일정 내용을 찾지 못했어요. 날짜·시간·장소가 들어 있는지 확인해 주세요." });
-    return reply(201, intake.draftView(d));
+    return reply(201, intake.draftView(d, "guardian"));
   });
   r("POST", "/api/drafts/:id/accept", async (req) => {
-    const s = await intake.acceptDraft(Number(req.params.id), req.body?.force === true);
+    const s = await intake.acceptDraft(Number(req.params.id), req.body?.force === true, { viewer: "guardian" });
     return reply(200, scheduleView(s));
   });
   r("PUT", "/api/drafts/:id", async (req) => {
@@ -162,7 +170,7 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
     const id = Number(req.params.id);
     if (!db.getDraft(id)) return reply(404, { error: "없는 일정이에요." });
     db.updateDraft(id, { ...rest, ...(start_local ? { start_at: fromSeoulLocal(start_local).toISOString() } : {}) });
-    return reply(200, intake.draftView(db.getDraft(id)!));
+    return reply(200, intake.draftView(db.getDraft(id)!, "guardian"));
   });
   r("POST", "/api/drafts/:id/dismiss", async (req) => {
     intake.dismissDraft(Number(req.params.id));
@@ -179,14 +187,17 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
     return reply(200, await intake.fromSms(p.id, text));
   });
   r("DELETE", "/api/schedules/:id", async (req) => {
+    if (!sharedSchedule(req)) return notFound();
     await flow.cancel(Number(req.params.id));
     return reply(204);
   });
   r("POST", "/api/schedules/:id/ask-now", async (req) => {
+    if (!sharedSchedule(req)) return notFound();
     await flow.askNow(Number(req.params.id));
     return reply(200, scheduleView(db.getSchedule(Number(req.params.id))!));
   });
   r("POST", "/api/schedules/:id/choose", async (req) => {
+    if (!sharedSchedule(req)) return notFound();
     const mode = ModeZ.parse(req.body?.mode);
     await flow.choose(Number(req.params.id), mode, "guardian");
     return reply(200, scheduleView(db.getSchedule(Number(req.params.id))!));
@@ -264,12 +275,13 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
   r("POST", "/api/p/:token/drafts/:id/accept", async (req) => {
     const own = ownDraft(req);
     if (!own) return reply(404, { error: "일정을 찾을 수 없어요." });
+    const shared = req.body?.shared !== false; // "나만 볼게요"면 false
     try {
-      const s = await intake.acceptDraft(own.d.id, req.body?.force === true);
-      return reply(200, { ok: true, scheduleId: s.id });
+      const s = await intake.acceptDraft(own.d.id, req.body?.force === true, { shared });
+      return reply(200, { ok: true, scheduleId: s.id, shared: s.shared === 1 });
     } catch (err) {
-      // 장소를 못 찾았으면 자녀에게 넘김
-      if (err instanceof IncompleteError && !err.missing.includes("날짜·시간")) {
+      // 장소를 못 찾았으면 자녀에게 넘김 (자녀에게 보여주기로 한 일정만)
+      if (shared && err instanceof IncompleteError && !err.missing.includes("날짜·시간")) {
         intake.handToGuardian(own.d.id);
         return reply(200, { ok: true, handedToGuardian: true });
       }

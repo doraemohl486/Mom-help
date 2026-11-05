@@ -37,6 +37,8 @@ export interface Schedule {
   stages_sent: string; // JSON string[]
   taxi_call_at: string | null; // ISO, 택시 예약 호출 시각
   source: ScheduleSource;
+  /** 자녀에게 보여줄지 (1: 보임, 0: 부모님만). 병원·자녀가 넣은 일정은 늘 1 */
+  shared: number;
   created_at: string;
 }
 
@@ -141,6 +143,7 @@ CREATE TABLE IF NOT EXISTS schedules (
   stages_sent TEXT NOT NULL DEFAULT '[]',
   taxi_call_at TEXT,
   source TEXT NOT NULL DEFAULT 'guardian',
+  shared INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS drafts (
@@ -204,7 +207,7 @@ export function openDb(file: string) {
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec(SCHEMA);
   // 예전 DB 파일에 새 칸 추가
-  for (const col of ["real_name TEXT NOT NULL DEFAULT ''@parents", "avatar TEXT NOT NULL DEFAULT ''@parents", "taxi_call_at TEXT@schedules", "source TEXT NOT NULL DEFAULT 'guardian'@schedules"]) {
+  for (const col of ["real_name TEXT NOT NULL DEFAULT ''@parents", "avatar TEXT NOT NULL DEFAULT ''@parents", "taxi_call_at TEXT@schedules", "source TEXT NOT NULL DEFAULT 'guardian'@schedules", "shared INTEGER NOT NULL DEFAULT 1@schedules"]) {
     const [def, table] = col.split("@");
     try {
       db.exec(`ALTER TABLE ${table} ADD COLUMN ${def}`);
@@ -254,19 +257,20 @@ export function openDb(file: string) {
     // ---------- schedules ----------
     createSchedule(
       s: Pick<Schedule, "parent_id" | "title" | "kind" | "place_name" | "place_address" | "place_lat" | "place_lng" | "start_at" | "memo">
-        & { source?: ScheduleSource },
+        & { source?: ScheduleSource; shared?: boolean },
     ): Schedule {
       const r = run(
-        `INSERT INTO schedules (parent_id, title, kind, place_name, place_address, place_lat, place_lng, start_at, memo, source, created_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO schedules (parent_id, title, kind, place_name, place_address, place_lat, place_lng, start_at, memo, source, shared, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
         s.parent_id, s.title, s.kind, s.place_name, s.place_address, s.place_lat, s.place_lng, s.start_at, s.memo,
-        s.source ?? "guardian", now(),
+        s.source ?? "guardian", s.shared === false ? 0 : 1, now(),
       );
       return this.getSchedule(Number(r.lastInsertRowid))!;
     },
     getSchedule: (id: number) => one<Schedule>(`SELECT * FROM schedules WHERE id=?`, id),
+    /** 자녀 화면용: 자녀에게 보여주는 일정만 */
     listSchedules: (fromIso: string) =>
-      all<Schedule>(`SELECT * FROM schedules WHERE start_at >= ? ORDER BY start_at`, fromIso),
+      all<Schedule>(`SELECT * FROM schedules WHERE start_at >= ? AND shared = 1 ORDER BY start_at`, fromIso),
     listSchedulesForParent: (parentId: number, fromIso: string) =>
       all<Schedule>(
         `SELECT * FROM schedules WHERE parent_id=? AND start_at >= ? AND status != 'cancelled' ORDER BY start_at`,
@@ -280,7 +284,7 @@ export function openDb(file: string) {
     /** 달력용: 기간 안의 일정 (취소 제외). parentId가 null이면 모든 부모님 */
     listSchedulesBetween: (fromIso: string, toIso: string, parentId: number | null = null) =>
       parentId === null
-        ? all<Schedule>(`SELECT * FROM schedules WHERE start_at >= ? AND start_at < ? AND status != 'cancelled' ORDER BY start_at`, fromIso, toIso)
+        ? all<Schedule>(`SELECT * FROM schedules WHERE start_at >= ? AND start_at < ? AND status != 'cancelled' AND shared = 1 ORDER BY start_at`, fromIso, toIso)
         : all<Schedule>(
             `SELECT * FROM schedules WHERE parent_id=? AND start_at >= ? AND start_at < ? AND status != 'cancelled' ORDER BY start_at`,
             parentId, fromIso, toIso,

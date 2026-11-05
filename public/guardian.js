@@ -216,7 +216,7 @@ function render() {
       const [icon, tone] = NOTIF_KIND[n.kind] || ["bell", ""];
       return `<div class="notif ${tone ? `k-${tone}` : ""}"><span class="ic">${ic(icon)}</span><div>${esc(n.message)}</div><time>${fmtTime.format(new Date(n.created_at))}</time></div>`;
     }).join("")
-    : `<div class="empty"><b>아직 알림이 없어요</b>부모님 일정 알림과 택시 배차 소식이 여기에 모여요.</div>`;
+    : `<div class="empty"><b>평소엔 조용해요</b>부모님이 답이 없거나, 택시를 못 불렀거나, 태워 달라고 하실 때만 알려 드려요. 진행 상황은 일정을 펼치면 볼 수 있어요.</div>`;
   const newest = notifications[0]?.id ?? 0;
   if (view === "alerts") seenNotif = newest;
   $("#alertDot").hidden = !(newest > seenNotif);

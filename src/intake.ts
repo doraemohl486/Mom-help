@@ -3,7 +3,7 @@ import type { Db, Draft, Schedule, ScheduleSource } from "./db.ts";
 import type { Notifier } from "./notify.ts";
 import type { TripFlow } from "./flow.ts";
 import type { AppointmentParser } from "./parse.ts";
-import { searchExactPlaces } from "./places.ts";
+import { approxPlace, searchExactPlaces } from "./places.ts";
 import { guessKind } from "./parse.ts";
 import { formatDate, formatTime, fromSeoulLocal, iGa } from "./time.ts";
 
@@ -35,7 +35,10 @@ export class IncompleteError extends Error {
 export type NewSchedule = Pick<
   Schedule,
   "parent_id" | "title" | "kind" | "place_name" | "place_address" | "place_lat" | "place_lng" | "start_at" | "memo"
-> & { source?: ScheduleSource };
+> & { source?: ScheduleSource; shared?: boolean };
+
+/** 누가 보는 화면인지: 자녀에게는 부모님만 보는 일정을 감춘다 */
+export type Viewer = "parent" | "guardian";
 
 const norm = (s: string) => s.replace(/\s|\(.*?\)/g, "");
 
@@ -69,18 +72,24 @@ export class Intake {
     this.notifier = notifier;
   }
 
-  findConflicts(parentId: number, startIso: string, placeName: string, excludeId: number | null = null): Conflict[] {
+  /** viewer가 자녀면 부모님만 보는 일정은 "다른 일정"으로만 보여 준다 */
+  findConflicts(parentId: number, startIso: string, placeName: string, excludeId: number | null = null, viewer: Viewer = "parent"): Conflict[] {
     const t = new Date(startIso).getTime();
     return this.db.findNearbySchedules(parentId, startIso, timing.overlapWindowMin, excludeId).map((s) => {
       const diffMin = Math.abs(new Date(s.start_at).getTime() - t) / 60_000;
       const dup = diffMin <= timing.duplicateWindowMin && samePlace(s.place_name, placeName);
-      return { id: s.id, title: s.title, place_name: s.place_name, start_at: s.start_at, type: dup ? "duplicate" : "overlap" };
+      const hide = viewer === "guardian" && s.shared === 0;
+      return {
+        id: hide ? 0 : s.id, title: hide ? "" : s.title, place_name: hide ? "다른 일정" : s.place_name,
+        start_at: s.start_at, type: dup && !hide ? "duplicate" : "overlap",
+      };
     });
   }
 
-  /** 일정 저장 (겹치는 일정이 있으면 force 없이는 ConflictError) */
-  async createSchedule(input: NewSchedule, force = false): Promise<Schedule> {
-    const conflicts = this.findConflicts(input.parent_id, input.start_at, input.place_name);
+  /** 일정 저장 (겹치는 일정이 있으면 force 없이는 ConflictError). 병원 일정은 늘 자녀에게 보임 */
+  async createSchedule(input: NewSchedule, force = false, viewer: Viewer = "parent"): Promise<Schedule> {
+    if (input.kind === "병원" || input.source === "sms" || input.source === "guardian" || input.source === undefined) input = { ...input, shared: true };
+    const conflicts = this.findConflicts(input.parent_id, input.start_at, input.place_name, null, viewer);
     if (conflicts.length && !force) throw new ConflictError(conflicts);
     const s = this.db.createSchedule(input);
     await this.flow.plan(s.id);
@@ -120,24 +129,36 @@ export class Intake {
     return missing;
   }
 
-  draftView(d: Draft) {
+  draftView(d: Draft, viewer: Viewer = "parent") {
     return {
       ...d,
       missing: this.missingFields(d),
-      conflicts: d.start_at ? this.findConflicts(d.parent_id, d.start_at, d.place_name) : [],
+      conflicts: d.start_at ? this.findConflicts(d.parent_id, d.start_at, d.place_name, null, viewer) : [],
+      /** 부모님께 "자녀에게도 보여줄까요?"를 물어야 하는지 (병원은 늘 보임) */
+      ask_share: d.source === "parent" && d.kind !== "병원",
     };
   }
 
-  /** 임시 일정을 실제 일정으로 저장 */
-  async acceptDraft(draftId: number, force = false): Promise<Schedule> {
+  /**
+   * 임시 일정을 실제 일정으로 저장.
+   * shared=false (부모님이 "나만 볼게요"): 장소 위치를 못 찾았으면 자녀에게 넘기지 않고 대략 위치로 저장
+   */
+  async acceptDraft(draftId: number, force = false, opts: { shared?: boolean; viewer?: Viewer } = {}): Promise<Schedule> {
     const d = this.db.getDraft(draftId);
     if (!d || (d.status !== "pending" && d.status !== "review")) throw new Error("이미 처리된 일정이에요.");
+    const shared = d.kind === "병원" || d.source !== "parent" ? true : opts.shared !== false;
+    if (!shared && d.place_name && (d.place_lat === null || d.place_lng === null)) {
+      const approx = approxPlace(d.place_name) ?? { lat: 37.5665, lng: 126.978 };
+      d.place_lat = approx.lat;
+      d.place_lng = approx.lng;
+      this.db.updateDraft(d.id, { place_lat: approx.lat, place_lng: approx.lng });
+    }
     const missing = this.missingFields(d);
     if (missing.length) throw new IncompleteError(missing);
     const s = await this.createSchedule({
       parent_id: d.parent_id, title: d.title, kind: d.kind, place_name: d.place_name, place_address: d.place_address,
-      place_lat: d.place_lat!, place_lng: d.place_lng!, start_at: d.start_at!, memo: d.memo, source: d.source,
-    }, force);
+      place_lat: d.place_lat!, place_lng: d.place_lng!, start_at: d.start_at!, memo: d.memo, source: d.source, shared,
+    }, force, opts.viewer ?? "parent");
     this.db.updateDraft(draftId, { status: "accepted", schedule_id: s.id });
     return s;
   }

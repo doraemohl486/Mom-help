@@ -47,3 +47,12 @@ test("일정 문장이면 바로 일정으로", () => {
   assert.ok(!intent("택시").includes("schedule"));
   assert.ok(intent("일정 알려줄게").includes("add"));
 });
+
+test("자녀에게 보여줄까요? — 보여줘 / 나만 볼게", () => {
+  const yn = ["yes", "no"];
+  assert.equal(first("보여줘", yn), "yes");
+  assert.equal(first("응 보여줄게", yn), "yes");
+  assert.equal(first("나만 볼게", yn), "no");
+  assert.equal(first("안 보여줘도 돼", yn), "no");
+  assert.equal(first("보여주지 마", yn), "no");
+});

@@ -40,7 +40,7 @@ async function waitFor(cond: () => boolean, ms = 3000) {
   }
 }
 
-test("택시 선택 → AI가 가상 콜센터와 통화 → 배차 → 부모님·자녀 알림", async () => {
+test("택시 선택 → AI가 가상 콜센터와 통화 → 배차 → 부모님께 알림 (자녀에게는 평소 진행을 알리지 않음)", async () => {
   const { svc, sched } = setup();
   await svc.flow.askNow(sched.id);
   assert.equal(svc.db.getSchedule(sched.id)!.status, "asked");
@@ -52,7 +52,8 @@ test("택시 선택 → AI가 가상 콜센터와 통화 → 배차 → 부모�
   const transcript = JSON.parse(call.transcript) as { who: string; text: string }[];
   assert.match(transcript.find((t) => t.who === "ai")!.text, /김영희 어르신.*AI 비서/);
   assert.ok(svc.db.listNotifications("parent", null).some((n) => n.kind === "dispatched"));
-  assert.ok(svc.db.listNotifications("guardian", null).some((n) => n.kind === "dispatched"));
+  assert.equal(svc.db.listNotifications("guardian", null).length, 0, "문제가 없으면 자녀 알림 없음");
+  assert.ok(svc.db.listEvents(sched.id).some((e) => e.type === "dispatched"), "진행 기록에는 남음");
 });
 
 test("ARS 메뉴가 나오면 6번을 누르고 진행한다", async () => {
@@ -197,7 +198,7 @@ test("예약 문자 자동 가져오기: 저장 → 같은 문자 또 오면 건
   assert.equal(s.start_at, fromSeoulLocal("2026-11-19T14:30").toISOString());
   assert.match(s.memo, /30분 전 도착/);
   assert.match(s.title, /정형외과/);
-  assert.ok(svc.db.listNotifications("guardian", null).some((n) => n.kind === "sms_imported"));
+  assert.ok(!svc.db.listNotifications("guardian", null).some((n) => n.kind === "sms_imported"), "잘 가져오면 자녀를 부르지 않음");
 
   // 병원은 전날 안내 문자를 또 보낸다 → 중복이라 건너뜀
   const r2 = await svc.intake.fromSms(parent.id, "[세브란스병원] 내일(11/19) 14:30 진료 예정입니다.", fromSeoulLocal("2026-11-18T10:00"));
@@ -351,4 +352,58 @@ test("자동 가져오기는 병원 예약 문자만: 모임·경조사 문자�
   // 직접 붙여 넣은 모임 문자는 넣을 수 있음 (자녀가 고른 것)
   const pasted = await svc.intake.draftFromText(parent.id, "[동창회] 11/14(토) 낮 12시 종로구 탑골공원", "guardian", now);
   assert.equal(pasted?.kind, "모임");
+});
+
+test("부모님만 보는 일정: 자녀 화면·달력에 안 보이고, 겹침은 '다른 일정'으로만, 알림은 장소 없이", async () => {
+  const { svc, parent, sched } = setup();
+  const app = createApp(svc);
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const post = (url: string, body: unknown) =>
+    fetch(base + url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  try {
+    // 부모님이 말로 알려 준 모임 → "나만 볼게요"
+    const draft = await (await post(`/api/p/${parent.token}/parse`, { text: "11월 13일 낮 12시 종로구 탑골공원 동창 모임" })).json();
+    assert.equal(draft.ask_share, true);
+    const ok = await (await post(`/api/p/${parent.token}/drafts/${draft.id}/accept`, { shared: false })).json();
+    assert.equal(ok.shared, false);
+    const privateId = ok.scheduleId;
+
+    const state = await (await fetch(`${base}/api/state`)).json();
+    assert.ok(!state.schedules.some((s: { id: number }) => s.id === privateId), "자녀 목록에 없음");
+    assert.ok(state.schedules.some((s: { id: number }) => s.id === sched.id), "병원 일정은 보임");
+    const range = `from=${encodeURIComponent(fromSeoulLocal("2026-11-01T00:00").toISOString())}&to=${encodeURIComponent(fromSeoulLocal("2026-12-01T00:00").toISOString())}`;
+    const cal = await (await fetch(`${base}/api/calendar?${range}`)).json();
+    assert.ok(!cal.some((s: { id: number }) => s.id === privateId), "자녀 달력에 없음");
+    const mine = await (await fetch(`${base}/api/p/${parent.token}/calendar?${range}`)).json();
+    assert.ok(mine.some((s: { id: number }) => s.id === privateId), "부모님 달력에는 있음");
+
+    // 자녀가 같은 시간에 일정을 넣으려 하면: 겹친다고만, 무슨 일정인지는 안 알려 줌
+    const clash = await post("/api/schedules", {
+      parent_id: parent.id, title: "점심", place_name: "서울역", place_address: "서울", place_lat: 37.55, place_lng: 126.97, start_local: "2026-11-13T12:30",
+    });
+    assert.equal(clash.status, 409);
+    const c = (await clash.json()).conflicts[0];
+    assert.equal(c.place_name, "다른 일정");
+    assert.equal(c.title, "");
+    assert.equal(c.id, 0);
+    // 자녀 화면에서 그 일정을 건드릴 수 없음
+    assert.equal((await post(`/api/schedules/${privateId}/ask-now`, {})).status, 404);
+
+    // 문제가 생기면 자녀에게 알리되 장소는 빼고
+    svc.calls.clock = () => fromSeoulLocal("2026-11-13T23:00"); // 운영 시간 밖 → 호출 실패
+    await svc.flow.choose(privateId, "taxi", "parent");
+    const alert = svc.db.listNotifications("guardian", null).find((n) => n.kind === "call_failed")!;
+    assert.match(alert.message, /개인 일정/);
+    assert.doesNotMatch(alert.message, /탑골|모임|종로/);
+    assert.equal(alert.schedule_id, null);
+
+    // 병원 일정은 물어보지 않고 늘 자녀에게 보임
+    const hosp = await (await post(`/api/p/${parent.token}/parse`, { text: "11월 25일 오전 9시 서울성모병원 안과" })).json();
+    assert.equal(hosp.ask_share, false);
+    const h = await (await post(`/api/p/${parent.token}/drafts/${hosp.id}/accept`, { shared: false })).json();
+    assert.equal(h.shared, true);
+  } finally {
+    server.close();
+  }
 });
