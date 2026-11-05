@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>엄빠어디가야 체험판</title>
+  <style>
+/*__STYLE__*/
+/* ---------------- 체험판 틀 ---------------- */
+.big { font-size: 24px; }
+.demo-top { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; flex-wrap: wrap; }
+.demo-top .brand { font-size: 18px; font-weight: 800; }
+.demo-top .brand span { color: var(--brand); }
+.demo-top .brand small { font-size: 12px; font-weight: 600; color: var(--sub); margin-left: 6px; background: #ffe9de; color: #c2490f; padding: 2px 8px; border-radius: 999px; }
+.tabs { display: flex; gap: 6px; }
+.tabs button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 15px; }
+.tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.demo-grid { display: block; }
+.pane { display: none; }
+.pane.on { display: block; }
+.phone-bar { max-width: 560px; margin: 0 auto; padding: 10px 18px 0; font-size: 14px; color: var(--sub); display: flex; justify-content: space-between; }
+#phoneBanner { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+.banner { background: var(--ink); color: #fff; border-radius: 16px; padding: 12px 14px; margin-top: 10px; font-size: 16px; line-height: 1.4; animation: drop .25s ease-out; }
+@keyframes drop { from { transform: translateY(-8px); opacity: 0; } }
+.tools { max-width: 560px; margin: 0 auto; padding: 16px; }
+.tools textarea { min-height: 90px; }
+.tools .row { flex-wrap: wrap; }
+.demo-note { font-size: 14px; color: var(--sub); }
+@media (min-width: 1100px) {
+  .tabs { display: none; }
+  .demo-grid { display: grid; grid-template-columns: minmax(0, 1fr) 430px 340px; gap: 0; align-items: start; }
+  .pane { display: block; max-height: calc(100vh - 56px); overflow: auto; position: sticky; top: 56px; }
+  #pane-parent { background: #fff; border-left: 1px solid var(--line); border-right: 1px solid var(--line); min-height: calc(100vh - 56px); }
+  .pane-title { display: block !important; }
+}
+.pane-title { display: none; font-size: 13px; font-weight: 700; color: var(--sub); padding: 12px 18px 0; letter-spacing: .02em; }
+  </style>
+</head>
+<body>
+<header class="demo-top">
+  <div class="brand">엄빠<span>어디가야</span><small>체험판</small></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="guardian" class="on">👩 자녀 화면</button>
+    <button data-tab="parent">👵 <span class="pname">엄마</span> 화면</button>
+    <button data-tab="tools">🧪 체험 도구</button>
+  </nav>
+</header>
+
+<main class="demo-grid">
+  <section class="pane on" id="pane-guardian">
+    <div class="pane-title">👩 자녀 화면</div>
+<!--__GUARDIAN__-->
+  </section>
+
+  <section class="pane" id="pane-parent">
+    <div class="pane-title">👵 <span class="pname">엄마</span> 폰 화면</div>
+    <div class="phone-bar"><span>📱 <span class="pname">엄마</span> 폰</span><span id="phoneClock"></span></div>
+    <div id="phoneBanner"></div>
+    <div class="big"><div class="wrap" id="app"><div class="spinner"></div></div></div>
+  </section>
+
+  <section class="pane" id="pane-tools">
+    <div class="pane-title">🧪 체험 도구</div>
+    <div class="tools">
+      <div class="card">
+        <b>⏰ 체험판 시계</b>
+        <p style="margin:6px 0"><span id="clock"></span></p>
+        <p class="demo-note" style="margin:0 0 8px">다음 알림: <span id="next"></span></p>
+        <div class="row">
+          <button class="btn primary small" id="skipBtn">⏩ 다음 알림까지 건너뛰기</button>
+          <button class="btn small" id="clockReset">지금 시간으로</button>
+        </div>
+        <p class="demo-note">전날 알림 → 준비 알림 → "뭐 타고 가실래요?" → 무응답 시 자녀에게 → 예약 택시 호출을 순서대로 볼 수 있어요.</p>
+      </div>
+
+      <div class="card">
+        <b>📩 <span class="pname">엄마</span> 폰에 문자 오기</b>
+        <p class="demo-note">실제 앱에서는 부모님 폰의 병원 예약 문자가 자동으로 넘어와요. 여기서 흉내 내 보세요.</p>
+        <div class="seg" id="smsSamples" style="margin-bottom:8px">
+          <button type="button" data-s="new">예약 확정</button>
+          <button type="button" data-s="dup">같은 예약 안내 (중복)</button>
+          <button type="button" data-s="unknown">모르는 병원</button>
+          <button type="button" data-s="ad">광고</button>
+        </div>
+        <textarea id="smsText"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="btn primary small" id="smsSend">문자 보내기</button>
+          <span class="demo-note" id="smsResult"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <b>해보기 순서</b>
+        <ol class="demo-note" style="padding-left:18px;margin:8px 0 0;line-height:1.7">
+          <li>👵 엄마 화면에서 🚕 택시 → 예약 → <b>지금 바로 불러줘</b></li>
+          <li>👩 자녀 화면 'AI 통화 내용'에서 AI와 콜센터 대화 보기</li>
+          <li>'+ 일정 추가' → 📋 예약 문자 붙여넣기 → 자동으로 채우기</li>
+          <li>같은 일정을 한 번 더 저장 → 중복 팝업</li>
+          <li>👵 엄마 화면 📝 일정 알려주기 → "다음주 화요일 오전 10시 서울대병원"</li>
+          <li>위 📩 문자 오기 → 자동으로 일정 생성 / 중복은 건너뜀</li>
+          <li>자녀 화면 맨 아래 '배차 불가' 고르고 택시 → 3번 재시도 후 자녀에게</li>
+        </ol>
+        <p class="demo-note">체험판은 실제 전화를 걸지 않고 가상 콜센터와 통화해요. 운영 시간 제한도 없어요 (실제는 8~22시).
+          문자 읽기와 AI 통화는 규칙 기반으로 동작하고, 장소는 샘플 10곳만 찾을 수 있어요
+          (서울대학교병원, 세브란스병원, 서울아산병원, 삼성서울병원, 강남세브란스병원, 서울성모병원, 일산병원, 마포구청, 서울역, 탑골공원).
+          입력한 내용은 이 브라우저에만 저장돼요.</p>
+        <button class="btn small" id="resetBtn">처음부터 다시</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>/*__BUNDLE__*/</script>
+<script>
+  window.DEMO_PARENT_TOKEN = window.demo.firstParentToken();
+  window.DEMO_NO_MIC = true; // 체험판 화면에서는 마이크를 쓸 수 없어요
+  window.confirm = () => true;
+</script>
+<script>/*__GUARDIAN_JS__*/</script>
+<script>(() => {
+/*__PARENT_JS__*/
+})();</script>
+<script>/*__SHELL_JS__*/</script>
+</body>
+</html>

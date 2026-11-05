@@ -1,5 +1,6 @@
 // 부모님 간편 화면: 큰 글씨, 버튼 3개 이하, 소리로 듣기
-const token = location.pathname.split("/").pop();
+// 체험판에서는 window.DEMO_PARENT_TOKEN 으로 바꿔 끼울 수 있다
+const tok = () => window.DEMO_PARENT_TOKEN || location.pathname.split("/").pop();
 const app = document.getElementById("app");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const time = new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
@@ -26,7 +27,7 @@ function speak(text) {
 }
 
 async function load() {
-  const res = await fetch(`/api/p/${token}`);
+  const res = await fetch(`/api/p/${tok()}`);
   if (!res.ok) {
     app.innerHTML = `<p class="appt">링크가 올바르지 않아요.<small>자녀에게 다시 보내 달라고 해 주세요.</small></p>`;
     return;
@@ -36,7 +37,7 @@ async function load() {
   const s = data.current;
   const call = s?.calls?.[s.calls.length - 1];
   // 화면이 바뀌었을 때만 다시 그림 (버튼 누르는 중 깜빡임 방지)
-  const key = JSON.stringify([s?.id, s?.status, call?.status, call?.car_number]);
+  const key = JSON.stringify([data.parent.name, s?.id, s?.status, call?.status, call?.car_number]);
   if (key !== lastKey) {
     lastKey = key;
     render();
@@ -145,7 +146,7 @@ function renderMain() {
 }
 
 // ---------------- 일정 알려주기 (말하기 또는 글쓰기 → 맞아요/다시) ----------------
-const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const Recognition = window.DEMO_NO_MIC ? null : window.SpeechRecognition || window.webkitSpeechRecognition;
 const fullWhen = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
 
 function backHome() {
@@ -189,7 +190,7 @@ async function submitText(text) {
   busy = true;
   app.innerHTML = `<div class="spinner"></div><p class="question" style="text-align:center">알아보는 중이에요</p>`;
   try {
-    const res = await fetch(`/api/p/${token}/parse`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    const res = await fetch(`/api/p/${tok()}/parse`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || "다시 말씀해 주세요");
     showConfirm(d);
@@ -217,7 +218,7 @@ function showConfirm(d) {
 }
 
 async function acceptDraft(d, force) {
-  const res = await fetch(`/api/p/${token}/drafts/${d.id}/accept`, {
+  const res = await fetch(`/api/p/${tok()}/drafts/${d.id}/accept`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force }),
   });
   const out = await res.json().catch(() => ({}));
@@ -245,11 +246,11 @@ function showConflict(d, conflicts) {
     <button class="bigbtn ghost" id="cNo">${dup ? "👌 안 넣을게요" : "안 넣을게요"}</button>
     <button class="bigbtn" id="cYes">그래도 넣을게요</button>
   </div>`;
-  document.body.appendChild(modal);
+  (document.querySelector(".big") || document.body).appendChild(modal);
   speak(`${title}. ${fullWhen.format(new Date(c.start_at))} ${c.place_name}. 그래도 넣을까요?`);
   modal.querySelector("#cNo").onclick = async () => {
     modal.remove();
-    await fetch(`/api/p/${token}/drafts/${d.id}/dismiss`, { method: "POST" });
+    await fetch(`/api/p/${tok()}/drafts/${d.id}/dismiss`, { method: "POST" });
     backHome();
   };
   modal.querySelector("#cYes").onclick = () => {
@@ -262,7 +263,7 @@ async function post(action, body, okMsg) {
   if (busy) return;
   busy = true;
   try {
-    const res = await fetch(`/api/p/${token}/${action}`, {
+    const res = await fetch(`/api/p/${tok()}/${action}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ scheduleId: data.current.id, ...body }),
     });
