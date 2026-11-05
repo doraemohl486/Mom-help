@@ -49,6 +49,13 @@ let selDay = todayKey0();
 let homeMode = "cal";
 let calData = [];
 let calLoaded = "";
+// 달력 접기/펼치기 (기본: 접어서 한 주만). 마지막 상태를 기억한다
+let calOpen = false;
+try {
+  calOpen = localStorage.getItem("eombba-cal-open") === "1";
+} catch {
+  /* 저장소 없음 */
+}
 
 function toast(msg) {
   const t = $("#toast");
@@ -240,7 +247,11 @@ function renderCalendar(byId, nowList) {
   const cells = [];
   // 마지막 줄이 모두 다음 달이면 5줄만
   const rows = dayKey(new Date(start.getTime() + 35 * 86400000)).slice(5, 7) === String(calM).padStart(2, "0") ? 6 : 5;
+  // 접었을 때는 고른 날이 있는 주 한 줄만
+  const selIdx = Math.round((kstMidnight(selDay).getTime() - start.getTime()) / 86400000);
+  const selRow = Math.min(rows - 1, Math.max(0, Math.floor(selIdx / 7)));
   for (let i = 0; i < rows * 7; i++) {
+    if (!calOpen && Math.floor(i / 7) !== selRow) continue;
     const d = new Date(start.getTime() + i * 86400000);
     const k = dayKey(d);
     const [, mm, dd] = k.split("-").map(Number);
@@ -255,15 +266,18 @@ function renderCalendar(byId, nowList) {
       <span class="cal-dots">${dots}${list.length > 3 ? `<b>+${list.length - 3}</b>` : ""}</span>
     </button>`);
   }
+  const unit = calOpen ? "달" : "주";
+  $("#calBox").classList.toggle("open", calOpen);
   $("#calBox").innerHTML = `
     <div class="cal-head">
-      <button type="button" class="btn small ghost icon" data-nav="-1" aria-label="이전 달">${ic("back")}</button>
-      <b class="cal-title">${calY}년 ${calM}월</b>
-      <button type="button" class="btn small ghost icon" data-nav="1" aria-label="다음 달">${ic("chevron")}</button>
+      <button type="button" class="btn small ghost icon" data-nav="-1" aria-label="이전 ${unit}">${ic("back")}</button>
+      <button type="button" class="cal-title" data-toggle aria-expanded="${calOpen}">${calY}년 ${calM}월</button>
+      <button type="button" class="btn small ghost icon" data-nav="1" aria-label="다음 ${unit}">${ic("chevron")}</button>
       <button type="button" class="btn small push" data-nav="0">오늘</button>
     </div>
     <div class="cal-grid cal-wd">${["일", "월", "화", "수", "목", "금", "토"].map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
-    <div class="cal-grid">${cells.join("")}</div>
+    <div class="cal-grid cal-days">${cells.join("")}</div>
+    <button type="button" class="cal-handle" data-toggle aria-expanded="${calOpen}">${ic(calOpen ? "up" : "down")}${calOpen ? "접기" : "한 달 보기"}</button>
     ${state.parents.length > 1 ? `<div class="cal-legend">${state.parents.map((p, i) => `<span><i class="dot-p a${i % 3}"></i>${esc(p.name)}</span>`).join("")}</div>` : ""}`;
 
   // 고른 날의 일정
@@ -292,9 +306,33 @@ function moveMonth(delta) {
   refresh(true);
 }
 
+function moveWeek(delta) {
+  const next = new Date(kstMidnight(selDay).getTime() + delta * 7 * 86400000 + 12 * 3600000);
+  selDay = dayKey(next);
+  const [y, m] = selDay.split("-").map(Number);
+  if (y !== calY || m !== calM) {
+    calY = y;
+    calM = m;
+    return refresh(true);
+  }
+  render();
+}
+
 $("#calBox").addEventListener("click", (e) => {
+  if (e.target.closest("[data-toggle]")) {
+    calOpen = !calOpen;
+    try {
+      localStorage.setItem("eombba-cal-open", calOpen ? "1" : "0");
+    } catch {
+      /* 저장소 없음 */
+    }
+    return render();
+  }
   const nav = e.target.closest("[data-nav]");
-  if (nav) return moveMonth(Number(nav.dataset.nav));
+  if (nav) {
+    const d = Number(nav.dataset.nav);
+    return d !== 0 && !calOpen ? moveWeek(d) : moveMonth(d);
+  }
   const cell = e.target.closest("[data-day]");
   if (!cell) return;
   selDay = cell.dataset.day;

@@ -400,3 +400,13 @@ details.more > summary { cursor: pointer; color: var(--sub); font-size: var(--t2
 .heard { position: fixed; left: 50%; bottom: var(--s5); transform: translateX(-50%); z-index: 45; width: min(480px, calc(100vw - 32px)); background: var(--ink); color: var(--surface); border-radius: var(--r2); padding: var(--s3) var(--s4); display: grid; gap: var(--s1); font-size: var(--b1); box-shadow: var(--shadow); }
 .heard b { color: var(--brand); }
 @media (prefers-reduced-motion: reduce) { .voice-orb.on::before, .voice-orb.on::after { animation: none; } }
+
+/* 달력 접기/펼치기 */
+.cal-title { border: 0; background: none; color: var(--ink); cursor: pointer; border-radius: var(--r1); padding: var(--s1) var(--s2); }
+.cal-title:hover { background: var(--bg); }
+.cal-days { animation: calIn .2s ease-out; }
+@keyframes calIn { from { opacity: .4; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .cal-days { animation: none; } }
+.cal-handle { display: flex; align-items: center; justify-content: center; gap: var(--s1); width: 100%; min-height: var(--h-sm); margin-top: var(--s1); border: 0; border-top: 1px solid var(--line); background: none; color: var(--sub); font-size: var(--t2); font-weight: 700; }
+.cal-handle svg { font-size: var(--t4); }
+.cal-handle:hover { color: var(--ink); }

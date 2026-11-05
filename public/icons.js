@@ -23,6 +23,8 @@
     sms: p('<path d="M4 5.5h16v11H9l-5 3.5z"/><path d="M8 10h8M8 13h5"/>'),
     edit: p('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
     warn: p('<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.2v.1"/>'),
+    down: p('<path d="M6 9l6 6 6-6"/>'),
+    up: p('<path d="M6 15l6-6 6 6"/>'),
     back: p('<path d="M15 6l-6 6 6 6"/>'),
     chevron: p('<path d="M9 6l6 6-6 6"/>'),
     walk: p('<circle cx="13" cy="4.5" r="1.8"/><path d="M10 21l2-6 3 3v3M9 12.5l1.5-4 4 2 2.5 2.5M10.5 8.5L7 10v3"/>'),
