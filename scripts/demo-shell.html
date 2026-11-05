@@ -4,24 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>엄빠어디가야 체험판</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap" />
   <style>
 /*__STYLE__*/
 /* ---------------- 체험판 틀 ---------------- */
-.big { font-size: 24px; }
+.pane { --app-h: calc(100dvh - 112px); }
 .demo-top { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line);
   display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; flex-wrap: wrap; }
-.demo-top .brand { font-size: 18px; font-weight: 800; }
-.demo-top .brand span { color: var(--brand); }
-.demo-top .brand small { font-size: 12px; font-weight: 600; color: var(--sub); margin-left: 6px; background: #ffe9de; color: #c2490f; padding: 2px 8px; border-radius: 999px; }
+.demo-top .brand { font-family: var(--font-display); font-size: 20px; display: flex; align-items: center; gap: 8px; }
+.demo-top .brand small { font-family: var(--font-body); font-size: 12px; font-weight: 700; background: var(--brand); color: var(--brand-ink); padding: 2px 9px; border-radius: 999px; }
 .tabs { display: flex; gap: 6px; }
-.tabs button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 15px; }
-.tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.tabs button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 14px; font-size: 15px; font-weight: 700; }
+.tabs button.on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .demo-grid { display: block; }
 .pane { display: none; }
 .pane.on { display: block; }
 .phone-bar { max-width: 560px; margin: 0 auto; padding: 10px 18px 0; font-size: 14px; color: var(--sub); display: flex; justify-content: space-between; }
 #phoneBanner { max-width: 560px; margin: 0 auto; padding: 0 16px; }
-.banner { background: var(--ink); color: #fff; border-radius: 16px; padding: 12px 14px; margin-top: 10px; font-size: 16px; line-height: 1.4; animation: drop .25s ease-out; }
+.banner { background: var(--ink); color: var(--surface); border-radius: 16px; padding: 12px 14px; margin-top: 10px; font-size: 16px; line-height: 1.4; animation: drop .25s ease-out; }
 @keyframes drop { from { transform: translateY(-8px); opacity: 0; } }
 .tools { max-width: 560px; margin: 0 auto; padding: 16px; }
 .tools textarea { min-height: 90px; }
@@ -30,8 +32,9 @@
 @media (min-width: 1100px) {
   .tabs { display: none; }
   .demo-grid { display: grid; grid-template-columns: minmax(0, 1fr) 430px 340px; gap: 0; align-items: start; }
-  .pane { display: block; max-height: calc(100vh - 56px); overflow: auto; position: sticky; top: 56px; }
-  #pane-parent { background: #fff; border-left: 1px solid var(--line); border-right: 1px solid var(--line); min-height: calc(100vh - 56px); }
+  .pane { display: block; height: calc(100vh - 56px); overflow: auto; position: sticky; top: 56px; --app-h: calc(100vh - 90px); }
+  #pane-parent { border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  #pane-parent .p-app { min-height: calc(100vh - 140px); }
   .pane-title { display: block !important; }
 }
 .pane-title { display: none; font-size: 13px; font-weight: 700; color: var(--sub); padding: 12px 18px 0; letter-spacing: .02em; }
@@ -39,7 +42,7 @@
 </head>
 <body>
 <header class="demo-top">
-  <div class="brand">엄빠<span>어디가야</span><small>체험판</small></div>
+  <div class="brand"><span>엄빠어디가야</span><small>체험판</small></div>
   <nav class="tabs" id="tabs">
     <button data-tab="guardian" class="on">👩 자녀 화면</button>
     <button data-tab="parent">👵 <span class="pname">엄마</span> 화면</button>
@@ -57,7 +60,7 @@
     <div class="pane-title">👵 <span class="pname">엄마</span> 폰 화면</div>
     <div class="phone-bar"><span>📱 <span class="pname">엄마</span> 폰</span><span id="phoneClock"></span></div>
     <div id="phoneBanner"></div>
-    <div class="big"><div class="wrap" id="app"><div class="spinner"></div></div></div>
+    <div class="big"><div id="app"><div class="spinner"></div></div></div>
   </section>
 
   <section class="pane" id="pane-tools">
@@ -117,6 +120,7 @@
   window.DEMO_NO_MIC = true; // 체험판 화면에서는 마이크를 쓸 수 없어요
   window.confirm = () => true;
 </script>
+<script>/*__ICONS_JS__*/</script>
 <script>/*__GUARDIAN_JS__*/</script>
 <script>(() => {
 /*__PARENT_JS__*/

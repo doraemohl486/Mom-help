@@ -1,24 +1,53 @@
+// 자녀(보호자) 화면
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const fmt = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
-const fmtTime = new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
-const MODE = { taxi: "🚕 택시", transit: "🚌 버스·지하철", family: "🚗 자녀 차량" };
+const ic = (name) => (window.ICONS && window.ICONS[name]) || "";
+const TZ = "Asia/Seoul";
+const fmt = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short", hour: "numeric", minute: "2-digit", timeZone: TZ });
+const fmtTime = new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: TZ });
+const fmtDay = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short", timeZone: TZ });
+const dayKey = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(d);
+const nowDate = () => (window.demo?.now ? window.demo.now() : new Date());
+
+/** "오전 10:30" → { ampm: "오전", hm: "10:30" } */
+function splitTime(d) {
+  const parts = new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: TZ }).formatToParts(d);
+  const ampm = parts.find((p) => p.type === "dayPeriod")?.value ?? "";
+  const h = parts.find((p) => p.type === "hour")?.value ?? "";
+  const m = parts.find((p) => p.type === "minute")?.value ?? "";
+  return { ampm, hm: `${h}:${m}` };
+}
+
+const MODE = {
+  taxi: { name: "택시", icon: "taxi" },
+  transit: { name: "버스·지하철", icon: "transit" },
+  family: { name: "자녀 차량", icon: "family" },
+};
 const STATUS = {
   scheduled: ["예정", ""], asked: ["물어보는 중", "brand"], escalated: ["답이 없으세요", "warn"],
-  chosen: ["선택 완료", "ok"], calling: ["AI가 택시 부르는 중", "brand"], dispatched: ["택시 배차 완료", "ok"],
-  call_failed: ["택시 호출 실패", "bad"], arrived: ["도착", "ok"], cancelled: ["취소됨", ""],
-  taxi_reserved: ["택시 예약됨", "ok"],
+  chosen: ["선택 완료", "ok"], taxi_reserved: ["택시 예약", "ok"], calling: ["AI 통화 중", "brand"],
+  dispatched: ["배차 완료", "ok"], call_failed: ["호출 실패", "bad"], arrived: ["도착", "ok"], cancelled: ["취소", ""],
 };
-const SOURCE = { sms: "📩 문자에서 가져옴", parent: "🗣 부모님이 알려 주심", guardian: "" };
+const SOURCE = { sms: "문자에서 가져옴", parent: "부모님이 알려 주심", guardian: "" };
+const NOTIF_KIND = {
+  dispatched: ["taxi", "ok"], arrived: ["check", "ok"], call_failed: ["warn", "bad"], escalate: ["warn", "warn"],
+  call_retry: ["phone", "warn"], sms_imported: ["sms", ""], sms_review: ["sms", "warn"], parent_review: ["edit", "warn"],
+  taxi_reserved: ["clock", ""], family: ["family", "warn"], chosen: ["check", ""], evening: ["bell", ""],
+};
 
 let state = null;
+let lastJson = "";
+const openIds = new Set(); // 펼친 일정
+const openTranscripts = new Set();
+let seenNotif = 0;
+let view = "home";
 
 function toast(msg) {
   const t = $("#toast");
   t.textContent = msg;
   t.style.display = "block";
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => (t.style.display = "none"), 2500);
+  toast.timer = setTimeout(() => (t.style.display = "none"), 2600);
 }
 
 async function api(method, url, body) {
@@ -32,6 +61,12 @@ async function api(method, url, body) {
     throw err;
   }
   return data;
+}
+
+function paintIcons(root = document) {
+  for (const el of root.querySelectorAll("[data-ic]")) {
+    if (!el.firstChild) el.innerHTML = ic(el.dataset.ic);
+  }
 }
 
 /** 저장하다 중복·겹치는 일정이 있으면 팝업으로 물어보고, '그래도 저장'이면 force로 다시 보낸다 */
@@ -49,12 +84,12 @@ async function saveWithConflictCheck(send) {
 function askConflict(conflicts) {
   const dlg = $("#conflictDlg");
   const dup = conflicts.some((c) => c.type === "duplicate");
-  $("#conflictTitle").textContent = dup ? "⚠️ 이미 같은 일정이 있어요" : "⚠️ 시간이 겹치는 일정이 있어요";
+  $("#conflictTitle").textContent = dup ? "이미 같은 일정이 있어요" : "시간이 겹치는 일정이 있어요";
   $("#conflictList").innerHTML = conflicts.map((c) => `
-    <div class="card" style="margin:8px 0">
+    <div class="card row" style="box-shadow:none">
       <span class="pill ${c.type === "duplicate" ? "bad" : "warn"}">${c.type === "duplicate" ? "같은 일정" : "2시간 안"}</span>
-      <b>${fmt.format(new Date(c.start_at))}</b><br>${esc(c.place_name)} ${c.title ? `· ${esc(c.title)}` : ""}
-    </div>`).join("") + `<p class="muted">${dup ? "같은 예약이 두 번 들어간 것 같아요." : "이동 시간이 빠듯할 수 있어요."}</p>`;
+      <div><b>${fmt.format(new Date(c.start_at))}</b><br><span class="muted">${esc(c.place_name)}${c.title ? ` · ${esc(c.title)}` : ""}</span></div>
+    </div>`).join("") + `<p class="muted" style="margin:0">${dup ? "같은 예약이 두 번 들어간 것 같아요." : "이동 시간이 빠듯할 수 있어요."}</p>`;
   dlg.showModal();
   return new Promise((resolve) => {
     $("#conflictForce").onclick = () => { dlg.close(); resolve(true); };
@@ -63,154 +98,270 @@ function askConflict(conflicts) {
   });
 }
 
-async function refresh() {
+async function refresh(force = false) {
   try {
-    state = await api("GET", "/api/state");
+    const next = await api("GET", "/api/state");
+    const json = JSON.stringify(next);
+    if (!force && json === lastJson) return; // 바뀐 게 없으면 다시 그리지 않음 (펼친 내용 유지)
+    lastJson = json;
+    state = next;
     render();
   } catch (e) {
     console.error(e);
   }
 }
 
+// ---------------------------------------------------------------- 화면 그리기
+const ACTIVE = ["asked", "escalated", "calling", "dispatched", "call_failed", "taxi_reserved", "chosen"];
+
+function isNow(s) {
+  if (!ACTIVE.includes(s.status)) return false;
+  // 오늘 일정이거나 지금 처리 중인 것
+  return dayKey(new Date(s.start_at)) === dayKey(nowDate()) || ["asked", "escalated", "calling", "dispatched", "call_failed"].includes(s.status);
+}
+
 function render() {
   const { parents, schedules, notifications } = state;
-  $("#setupHint").style.display = parents.length ? "none" : "block";
-  $("#provider").textContent = state.callProvider === "simulator" ? "시뮬레이터 (가상 콜센터)" : state.callProvider;
-  $("#simBox").style.display = state.callProvider === "simulator" ? "block" : "none";
-  for (const b of $("#scenario").children) b.classList.toggle("on", b.dataset.v === state.simulatorScenario);
+  const byId = Object.fromEntries(parents.map((p, i) => [p.id, { ...p, idx: i }]));
 
-  const byId = Object.fromEntries(parents.map((p) => [p.id, p]));
-  $("#schedules").innerHTML = schedules.length
-    ? schedules.map((s) => scheduleCard(s, byId[s.parent_id])).join("")
-    : `<div class="card muted">등록된 일정이 없어요. 오른쪽 위 '+ 일정 추가'를 눌러 주세요.</div>`;
+  $("#setupHint").hidden = parents.length > 0;
+  $("#famChips").innerHTML = parents.map((p, i) => `<span class="avatar a${i % 3}" title="${esc(p.name)}">${esc(p.name.slice(-1))}</span>`).join("");
 
+  // 요약 한 줄
+  const live = schedules.filter((s) => !["cancelled"].includes(s.status));
+  const today = live.filter((s) => dayKey(new Date(s.start_at)) === dayKey(nowDate()) && s.status !== "arrived");
+  const need = live.filter((s) => ["escalated", "call_failed"].includes(s.status)).length + (state.drafts || []).length;
+  $("#summary").textContent = !parents.length ? "부모님을 등록하고 시작해요"
+    : need ? `확인할 일이 ${need}개 있어요`
+      : today.length ? `오늘 일정 ${today.length}개, 잘 챙기고 있어요` : "오늘은 예정된 일정이 없어요";
+
+  // 지금 (진행 중)
+  const nowList = live.filter(isNow);
+  $("#nowBox").innerHTML = nowList.map((s) => scheduleCard(s, byId[s.parent_id], true)).join("");
+
+  // 확인 필요
   const drafts = state.drafts || [];
-  $("#draftsBox").style.display = drafts.length ? "block" : "none";
+  $("#draftsBox").hidden = !drafts.length;
+  $("#draftCount").textContent = drafts.length;
   $("#drafts").innerHTML = drafts.map((d) => draftCard(d, byId[d.parent_id])).join("");
 
-  $("#inboxBox").innerHTML = parents.length ? inboxHelp(parents) : `<span class="muted">부모님을 먼저 등록해 주세요.</span>`;
+  // 다가오는 일정 (날짜별)
+  const rest = live.filter((s) => !isNow(s) && s.status !== "arrived");
+  const done = schedules.filter((s) => s.status === "arrived" || s.status === "cancelled");
+  const groups = new Map();
+  for (const s of rest) {
+    const k = dayKey(new Date(s.start_at));
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(s);
+  }
+  const todayKey = dayKey(nowDate());
+  const tomorrowKey = dayKey(new Date(nowDate().getTime() + 86400000));
+  const dayName = (k, d) => (k === todayKey ? "오늘" : k === tomorrowKey ? "내일" : fmtDay.format(d));
+  $("#upcomingTitle").hidden = !rest.length && !done.length;
+  $("#schedules").innerHTML = (rest.length || done.length)
+    ? [...groups.entries()].map(([k, list]) => `
+        <div class="day"><div class="day-label">${dayName(k, new Date(list[0].start_at))}</div>
+          ${list.map((s) => scheduleCard(s, byId[s.parent_id], false)).join("")}</div>`).join("")
+      + (done.length ? `<details class="more"><summary>끝난 일정 ${done.length}개</summary><div class="stack" style="margin-top:8px">${done.map((s) => scheduleCard(s, byId[s.parent_id], false)).join("")}</div></details>` : "")
+    : (parents.length && !nowList.length ? `<div class="card empty"><b>등록된 일정이 없어요</b>아래 노란 + 버튼으로 추가하거나, 병원 예약 문자를 붙여 넣어 보세요.</div>` : "");
 
+  // 알림
   $("#notifs").innerHTML = notifications.length
-    ? notifications.slice(0, 8).map((n) => `<div class="notif"><span class="muted">${fmtTime.format(new Date(n.created_at))}</span> ${esc(n.message)}</div>`).join("")
-    : `<span class="muted">아직 알림이 없어요.</span>`;
+    ? notifications.slice(0, 30).map((n) => {
+      const [icon, tone] = NOTIF_KIND[n.kind] || ["bell", ""];
+      return `<div class="notif ${tone ? `k-${tone}` : ""}"><span class="ic">${ic(icon)}</span><div>${esc(n.message)}</div><time>${fmtTime.format(new Date(n.created_at))}</time></div>`;
+    }).join("")
+    : `<div class="empty"><b>아직 알림이 없어요</b>부모님 일정 알림과 택시 배차 소식이 여기에 모여요.</div>`;
+  const newest = notifications[0]?.id ?? 0;
+  if (view === "alerts") seenNotif = newest;
+  $("#alertDot").hidden = !(newest > seenNotif);
 
-  $("#parents").innerHTML = parents.map((p) => `
-    <div class="card">
-      <div class="row between"><b>${esc(p.name)}</b><span class="muted">${esc(p.phone)}</span></div>
-      <div class="muted">${esc(p.home_address)}</div>
-      <div class="row" style="margin-top:8px">
-        <a class="btn small" href="/p/${esc(p.token)}" target="_blank">${esc(p.name)} 화면 열기</a>
-        <button class="btn small" onclick="copyLink('${esc(p.token)}')">링크 복사</button>
+  // 가족
+  $("#parents").innerHTML = parents.map((p, i) => `
+    <div class="card parent-card">
+      <span class="avatar a${i % 3}">${esc(p.name.slice(-1))}</span>
+      <div>
+        <div class="row between"><b style="font-size:17px">${esc(p.name)}${p.real_name ? ` <span class="muted">(${esc(p.real_name)})</span>` : ""}</b><span class="muted">${esc(p.phone)}</span></div>
+        <div class="muted">${esc(p.home_address)}</div>
+        ${p.notes ? `<div class="muted">참고: ${esc(p.notes)}</div>` : ""}
+        <div class="row" style="margin-top:10px">
+          <a class="btn small primary" href="/p/${esc(p.token)}" target="_blank">${esc(p.name)} 화면 열기</a>
+          <button class="btn small" type="button" onclick="copyLink('${esc(p.token)}')">링크 복사</button>
+        </div>
       </div>
     </div>`).join("");
+  $("#inboxBox").innerHTML = parents.length ? inboxHelp(parents) : `<span class="muted">부모님을 먼저 등록해 주세요.</span>`;
+
+  // 설정
+  $("#provider").textContent = state.callProvider === "simulator" ? "시뮬레이터 (가상 콜센터)" : state.callProvider;
+  $("#simBox").hidden = state.callProvider !== "simulator";
+  for (const b of $("#scenario").children) b.classList.toggle("on", b.dataset.v === state.simulatorScenario);
+}
+
+function steps(s) {
+  const names = ["알림", "교통수단", "택시 호출", "배차", "도착"];
+  const taxi = s.chosen_mode === "taxi" || ["calling", "dispatched", "call_failed", "taxi_reserved"].includes(s.status);
+  if (!taxi && s.chosen_mode) names.splice(2, 2, "출발");
+  const at = {
+    scheduled: 0, asked: 1, escalated: 1, chosen: 2, taxi_reserved: 2, calling: 2, call_failed: 2, dispatched: 3, arrived: names.length,
+  }[s.status] ?? 0;
+  const sent = (s.stages_sent || []).length > 0 || s.status !== "scheduled";
+  return `<div class="steps" style="grid-template-columns:repeat(${names.length},1fr)">${names.map((n, i) => {
+    let cls = i < at ? "done" : i === at ? "now" : "";
+    if (i === 0 && sent && at === 0) cls = "now";
+    if (s.status === "call_failed" && i === 2) cls = "bad";
+    if (s.status === "taxi_reserved" && i === 2) cls = "now";
+    return `<div class="step ${cls}"><i></i>${n}</div>`;
+  }).join("")}</div>`;
+}
+
+function modesBlock(s) {
+  const cmp = s.route_options;
+  if (!cmp) return "";
+  const can = !["calling", "dispatched", "arrived", "cancelled"].includes(s.status);
+  const est = cmp.options.some((o) => o.source === "estimate");
+  return `<div>
+    <div class="modes">${cmp.options.map((o) => `
+      <button type="button" class="mode ${o.mode === cmp.recommended ? "rec" : ""} ${s.chosen_mode === o.mode ? "chosen" : ""}" ${can ? "" : "disabled"} onclick="choose(${s.id}, '${o.mode}')">
+        <span class="m-name">${ic(MODE[o.mode].icon)}${MODE[o.mode].name}</span>
+        <span class="m-time num">${o.durationMin}분</span>
+        <span class="m-sub">${o.costWon ? `${o.costWon.toLocaleString()}원` : "비용 없음"}${o.walkMeters ? ` · 걷기 ${o.walkMeters}m` : ""}</span>
+      </button>`).join("")}
+    </div>
+    <p class="reason" style="margin-top:8px">${esc(cmp.reason)}${est ? " (거리로 추정한 값)" : ""}</p>
+  </div>`;
+}
+
+function scheduleCard(s, p, hero) {
+  const [label, tone] = STATUS[s.status] || [s.status, ""];
+  const start = new Date(s.start_at);
+  const t = splitTime(start);
+  const open = hero || openIds.has(s.id);
+  const call = s.calls[s.calls.length - 1];
+  const attention = ["escalated"].includes(s.status);
+  const bad = s.status === "call_failed";
+
+  const banners = [];
+  if (s.status === "escalated") {
+    banners.push(`<div class="banner-warn">${ic("warn")}<span><b>${esc(p?.name ?? "")}</b> 답이 없으세요. 대신 골라 주세요.</span></div>`);
+  }
+  if (s.status === "taxi_reserved" && s.taxi_call_at) {
+    banners.push(`<div class="banner-ok">${ic("clock")}<span><b class="num" style="font-size:18px">${fmtTime.format(new Date(s.taxi_call_at))}</b>에 AI 비서가 택시를 불러요</span>
+      <button class="btn small dark" type="button" onclick="callNow(${s.id})" style="margin-left:auto">지금 바로 부르기</button></div>`);
+  }
+  if (s.status === "calling") {
+    banners.push(`<div class="banner-ok" style="background:var(--brand-soft)">${ic("phone")}<span>AI 비서가 동행 온다콜택시와 통화하고 있어요${call && call.attempt > 1 ? ` (${call.attempt}번째)` : ""}</span></div>`);
+  }
+  if (call && call.status === "dispatched") {
+    banners.push(`<div class="banner-ok">${ic("taxi")}<span class="plate-sm">${esc(call.car_number)}</span><span>${esc(call.car_description || "")}${call.eta_minutes ? ` · <b>${call.eta_minutes}분</b> 뒤 도착` : ""}</span></div>`);
+  }
+  if (bad) {
+    banners.push(`<div class="banner-bad">${ic("warn")}<span>택시를 못 불렀어요. 카카오T '대신 불러주기'나 1855-0120으로 불러 주세요.</span></div>`);
+  }
+
+  const transcript = call ? `
+    <details class="more" ${openTranscripts.has(s.id) ? "open" : ""} ontoggle="toggleTranscript(${s.id}, this.open)">
+      <summary>AI 통화 내용 ${call.transcript.length}줄</summary>
+      <div class="transcript" style="margin-top:8px">${call.transcript.map((x) => `<p><span class="who-${x.who}">${x.who === "ai" ? "AI 비서" : "콜센터"}</span> ${esc(x.text)}</p>`).join("")}</div>
+    </details>` : "";
+
+  const body = open ? `
+    <div class="sched-body">
+      ${steps(s)}
+      ${banners.join("")}
+      <div class="facts">
+        ${s.departure_at ? `<span>${ic("clock")}출발 <b>${fmtTime.format(new Date(s.departure_at))}</b></span>` : ""}
+        ${s.memo ? `<span>${ic("edit")}<b>${esc(s.memo)}</b></span>` : ""}
+        ${SOURCE[s.source] ? `<span>${ic(s.source === "sms" ? "sms" : "users")}${SOURCE[s.source]}</span>` : ""}
+      </div>
+      ${["dispatched", "arrived", "cancelled"].includes(s.status) ? "" : modesBlock(s)}
+      ${s.events.length ? `<details class="more"><summary>진행 기록 ${s.events.length}개</summary><ul class="timeline" style="margin-top:8px">${s.events.map((e) => `<li><time>${fmtTime.format(new Date(e.created_at))}</time><span>${esc(e.message)}</span></li>`).join("")}</ul></details>` : ""}
+      ${transcript}
+      <div class="actions">
+        ${["scheduled", "call_failed", "escalated", "taxi_reserved"].includes(s.status) ? `<button class="btn small" type="button" onclick="askNow(${s.id})">${ic("bell")}지금 물어보기 (데모)</button>` : ""}
+        ${!["cancelled", "arrived"].includes(s.status) ? `<button class="btn small ghost" type="button" onclick="cancelSched(${s.id})">일정 취소</button>` : ""}
+      </div>
+    </div>` : "";
+
+  return `
+  <div class="card sched ${hero ? "hero" : ""} ${attention ? "attention" : ""} ${bad ? "badstate" : ""}">
+    <button type="button" class="sched-head" ${hero ? "" : `onclick="toggleSched(${s.id})"`} aria-expanded="${open}">
+      <span class="sched-time"><small>${esc(t.ampm)}</small><span class="num">${esc(t.hm)}</span></span>
+      <span class="sched-main">
+        <span class="sched-title">${ic(s.kind) || ic("기타")}${esc(s.title)}</span>
+        <span class="sched-place">${esc(s.place_name)}${!hero && s.memo ? ` · ${esc(s.memo)}` : ""}</span>
+      </span>
+      <span class="sched-side"><span class="pill ${tone}">${label}</span><span class="who">${esc(p?.name ?? "")}</span></span>
+    </button>
+    ${body}
+  </div>`;
 }
 
 function draftCard(d, p) {
-  const when = d.start_at ? fmt.format(new Date(d.start_at)) : "날짜·시간 모름";
+  const when = d.start_at ? fmt.format(new Date(d.start_at)) : "날짜·시간을 모르겠어요";
   const warn = [
     ...d.missing.map((m) => `<span class="pill bad">${esc(m)} 확인</span>`),
-    ...d.conflicts.map((c) => `<span class="pill warn">${c.type === "duplicate" ? "같은 일정 있음" : "겹치는 일정"}: ${fmt.format(new Date(c.start_at))} ${esc(c.place_name)}</span>`),
+    ...d.conflicts.map((c) => `<span class="pill warn">${c.type === "duplicate" ? "같은 일정 있음" : "겹치는 일정"} · ${fmtTime.format(new Date(c.start_at))} ${esc(c.place_name)}</span>`),
   ].join(" ");
   return `
-  <div class="card">
-    <div class="row between"><b>${esc(p?.name ?? "")} · ${esc(when)}</b><span class="muted">${SOURCE[d.source] || ""}</span></div>
-    <div>${esc(d.title)} — ${esc(d.place_name || "장소 모름")}</div>
-    ${d.memo ? `<div class="muted">메모: ${esc(d.memo)}</div>` : ""}
-    <div style="margin-top:6px">${warn}</div>
-    <details style="margin-top:6px"><summary class="muted">받은 내용</summary><div class="transcript">${esc(d.raw_text)}</div></details>
-    <div class="row" style="margin-top:10px">
-      ${d.missing.length ? "" : `<button class="btn small primary" onclick="acceptDraft(${d.id})">저장</button>`}
-      <button class="btn small" onclick="editDraft(${d.id})">고쳐서 저장</button>
-      <button class="btn small" onclick="dismissDraft(${d.id})">무시</button>
+  <div class="card stripe-warn stack" style="gap:8px">
+    <div class="row between"><b>${esc(p?.name ?? "")} · ${esc(when)}</b><span class="pill">${ic(d.source === "sms" ? "sms" : "users")}${SOURCE[d.source] || "직접 입력"}</span></div>
+    <div>${esc(d.title)} · ${esc(d.place_name || "장소를 모르겠어요")}${d.memo ? ` <span class="muted">· ${esc(d.memo)}</span>` : ""}</div>
+    ${warn ? `<div class="row">${warn}</div>` : ""}
+    <details class="more"><summary>받은 내용</summary><div class="transcript" style="margin-top:6px">${esc(d.raw_text)}</div></details>
+    <div class="actions">
+      ${d.missing.length ? "" : `<button class="btn small primary" type="button" onclick="acceptDraft(${d.id})">저장</button>`}
+      <button class="btn small" type="button" onclick="editDraft(${d.id})">고쳐서 저장</button>
+      <button class="btn small ghost" type="button" onclick="dismissDraft(${d.id})">무시</button>
     </div>
   </div>`;
 }
 
 function inboxHelp(parents) {
-  return parents.map((p) => {
-    const url = `${location.origin}/api/inbox/${p.token}`;
-    return `<div style="margin-bottom:12px">
-      <b>${esc(p.name)} 폰</b>
-      <div class="transcript" style="word-break:break-all">${esc(url)}</div>
-      <button class="btn small" onclick="copyText('${esc(url)}')">주소 복사</button>
-    </div>`;
-  }).join("") + `
-    <details><summary class="muted">설정 방법</summary>
-      <p class="muted"><b>아이폰</b>: 단축어 앱 → 자동화 → '메시지' → 메시지에 <b>예약</b>(또는 <b>진료</b>) 포함 →
-        '즉시 실행' → 동작 'URL 콘텐츠 가져오기'에서 위 주소, 방법 POST, 본문 '파일'에 <b>메시지</b>를 넣어 주세요.</p>
-      <p class="muted"><b>안드로이드</b>: 'SMS 전달(웹훅)' 앱에서 '예약'이 들어간 문자를 위 주소로 POST 하도록 설정해 주세요.</p>
-      <p class="muted">같은 예약 문자가 또 오면(확정·전날 안내) 중복으로 보고 건너뛰어요. 날짜나 장소가 불확실하면 위 '확인이 필요한 일정'에 올라와요.</p>
+  return `<p class="muted" style="margin-top:0">부모님 폰에 온 병원 예약 문자를 이 주소로 넘기면 일정이 알아서 생겨요. 같은 예약 문자가 또 오면 건너뛰고, 애매하면 '확인이 필요해요'에 올려요.</p>`
+    + parents.map((p) => {
+      const url = `${location.origin}/api/inbox/${p.token}`;
+      return `<div class="stack" style="gap:6px;margin-bottom:12px"><b>${esc(p.name)} 폰</b><div class="mono">${esc(url)}</div>
+        <div><button class="btn small" type="button" onclick="copyText('${esc(url)}')">주소 복사</button></div></div>`;
+    }).join("") + `
+    <details class="more"><summary>폰 설정 방법</summary>
+      <p class="muted"><b>아이폰</b> · 단축어 → 자동화 → 메시지 → '예약' 또는 '진료' 포함 → 즉시 실행 → 'URL 콘텐츠 가져오기'에 위 주소, 방법 POST, 본문에 '메시지'</p>
+      <p class="muted"><b>안드로이드</b> · 문자 웹훅 전달 앱에서 '예약'이 들어간 문자를 위 주소로 POST</p>
     </details>`;
 }
 
-function scheduleCard(s, p) {
-  const [label, tone] = STATUS[s.status] || [s.status, ""];
-  const cmp = s.route_options;
-  const call = s.calls[s.calls.length - 1];
-  const active = !["calling", "dispatched", "arrived", "cancelled"].includes(s.status);
-  const reserved = s.status === "taxi_reserved" && s.taxi_call_at
-    ? `<div class="card" style="background:#f2fbf5;margin-top:10px">🚕 <b>${fmt.format(new Date(s.taxi_call_at))}</b>에 AI 비서가 택시를 불러요
-         <button class="btn small" style="margin-left:6px" onclick="callNow(${s.id})">지금 바로 부르기</button></div>` : "";
-  const opts = cmp ? `
-    <div class="options">${cmp.options.map((o) => `
-      <button class="opt ${o.mode === cmp.recommended ? "rec" : ""}" ${active ? "" : "disabled"} onclick="choose(${s.id}, '${o.mode}')">
-        <b>${MODE[o.mode]}</b><br>${o.durationMin}분${o.costWon ? ` · ${o.costWon.toLocaleString()}원` : ""}
-        ${o.walkMeters ? `<br><span class="muted">걷기 ${o.walkMeters}m</span>` : ""}
-      </button>`).join("")}
-    </div>
-    <div class="muted" style="margin-top:6px">추천: ${MODE[cmp.recommended]} — ${esc(cmp.reason)}
-      ${cmp.options.some((o) => o.source === "estimate") ? " (일부 추정치)" : ""}</div>` : "";
-  const car = call && call.status === "dispatched"
-    ? `<div class="card" style="background:#f2fbf5;margin-top:10px"><b>🚕 ${esc(call.car_number)}</b> ${esc(call.car_description || "")}
-         ${call.eta_minutes ? `· ${call.eta_minutes}분 후 도착` : ""}</div>` : "";
-  const transcript = call ? `
-    <details style="margin-top:8px"><summary class="muted">AI 통화 내용 (${call.transcript.length}줄)</summary>
-      <div class="transcript">${call.transcript.map((t) => `<p class="${t.who}"><b>${t.who === "ai" ? "AI 비서" : "콜센터"}</b>: ${esc(t.text)}</p>`).join("")}</div>
-    </details>` : "";
-  return `
-  <div class="card sched">
-    <div class="row between">
-      <span class="when">${esc(p?.name ?? "")} · ${fmt.format(new Date(s.start_at))}</span>
-      <span class="pill ${tone}">${label}</span>
-    </div>
-    <div class="where">${esc(s.title)} — ${esc(s.place_name)}</div>
-    ${s.memo ? `<div class="muted">메모: ${esc(s.memo)}</div>` : ""}
-    ${SOURCE[s.source] ? `<div class="muted">${SOURCE[s.source]}</div>` : ""}
-    ${s.departure_at ? `<div class="muted">예상 출발 ${fmtTime.format(new Date(s.departure_at))}</div>` : ""}
-    ${opts}
-    ${reserved}
-    ${car}
-    ${s.events.length ? `<ul class="timeline">${s.events.map((e) => `<li><time>${fmtTime.format(new Date(e.created_at))}</time>${esc(e.message)}</li>`).join("")}</ul>` : ""}
-    ${transcript}
-    <div class="row" style="margin-top:10px">
-      ${["scheduled", "call_failed", "escalated", "taxi_reserved"].includes(s.status) ? `<button class="btn small" onclick="askNow(${s.id})">지금 물어보기 (데모)</button>` : ""}
-      ${s.status !== "cancelled" && s.status !== "arrived" ? `<button class="btn small" onclick="cancelSched(${s.id})">취소</button>` : ""}
-    </div>
-  </div>`;
+// ---------------------------------------------------------------- 동작
+function toggleSched(id) {
+  if (openIds.has(id)) openIds.delete(id);
+  else openIds.add(id);
+  render();
 }
-
+function toggleTranscript(id, open) {
+  if (open) openTranscripts.add(id);
+  else openTranscripts.delete(id);
+}
 async function choose(id, mode) {
   if (mode === "taxi" && !confirm("AI 비서가 동행 온다콜택시에 전화해서 택시를 부를까요?")) return;
   try {
     await api("POST", `/api/schedules/${id}/choose`, { mode });
-    toast(mode === "taxi" ? "AI 비서가 전화를 걸고 있어요" : "전달했어요");
+    toast(mode === "taxi" ? "택시를 맡았어요" : "전달했어요");
   } catch (e) { toast(e.message); }
-  refresh();
+  refresh(true);
 }
 async function callNow(id) {
   try { await api("POST", `/api/schedules/${id}/call-now`); toast("AI 비서가 전화를 걸고 있어요"); } catch (e) { toast(e.message); }
-  refresh();
+  refresh(true);
 }
 async function acceptDraft(id) {
   try {
     const r = await saveWithConflictCheck((force) => api("POST", `/api/drafts/${id}/accept`, { force }));
     if (r) toast("일정을 저장했어요");
   } catch (e) { toast(e.message); }
-  refresh();
+  refresh(true);
 }
 async function dismissDraft(id) {
   await api("POST", `/api/drafts/${id}/dismiss`);
-  refresh();
+  refresh(true);
 }
 function editDraft(id) {
   const d = state.drafts.find((x) => x.id === id);
@@ -218,21 +369,37 @@ function editDraft(id) {
   fillFromDraft(d);
 }
 function copyText(t) {
-  navigator.clipboard?.writeText(t).then(() => toast("복사했어요"), () => prompt("주소", t));
+  navigator.clipboard?.writeText(t).then(() => toast("복사했어요"), () => toast("복사하지 못했어요. 길게 눌러 복사해 주세요."));
 }
 async function askNow(id) {
   try { await api("POST", `/api/schedules/${id}/ask-now`); toast("부모님께 물어봤어요"); } catch (e) { toast(e.message); }
-  refresh();
+  refresh(true);
 }
 async function cancelSched(id) {
   if (!confirm("이 일정을 취소할까요?")) return;
   await api("DELETE", `/api/schedules/${id}`);
-  refresh();
+  refresh(true);
 }
 function copyLink(token) {
   const url = `${location.origin}/p/${token}`;
-  navigator.clipboard?.writeText(url).then(() => toast("링크를 복사했어요. 부모님 폰으로 보내 주세요."), () => prompt("링크", url));
+  navigator.clipboard?.writeText(url).then(() => toast("링크를 복사했어요. 부모님 폰으로 보내 주세요."), () => toast("복사하지 못했어요."));
 }
+
+// 아래 탭
+function showView(name) {
+  view = name;
+  for (const b of document.querySelectorAll("#gTabs [data-view]")) b.classList.toggle("on", b.dataset.view === name);
+  for (const v of document.querySelectorAll(".g-view")) v.classList.toggle("on", v.id === `view-${name}`);
+  if (name === "alerts" && state) {
+    seenNotif = state.notifications[0]?.id ?? 0;
+    $("#alertDot").hidden = true;
+  }
+  ($("#gApp").closest(".pane") || window).scrollTo?.(0, 0);
+}
+$("#gTabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-view]");
+  if (b) showView(b.dataset.view);
+});
 
 // ---------------- 장소 검색 ----------------
 function bindPlaceSearch(form, resultsEl, onPick) {
@@ -241,17 +408,17 @@ function bindPlaceSearch(form, resultsEl, onPick) {
     clearTimeout(timer);
     timer = setTimeout(async () => {
       const q = form.placeQuery.value.trim();
-      if (!q) return (resultsEl.style.display = "none");
+      if (!q) return (resultsEl.hidden = true);
       const places = await api("GET", `/api/places?q=${encodeURIComponent(q)}`);
       resultsEl.innerHTML = places.length
         ? places.map((p, i) => `<div data-i="${i}"><b>${esc(p.name)}</b><br><span class="muted">${esc(p.address)}</span></div>`).join("")
         : `<div class="muted">검색 결과가 없어요</div>`;
-      resultsEl.style.display = "block";
+      resultsEl.hidden = false;
       resultsEl.onclick = (ev) => {
         const i = ev.target.closest("[data-i]")?.dataset.i;
         if (i === undefined) return;
         onPick(places[Number(i)]);
-        resultsEl.style.display = "none";
+        resultsEl.hidden = true;
       };
     }, 250);
   });
@@ -277,8 +444,11 @@ bindPlaceSearch(parentForm, $("#homeResults"), (p) => {
 });
 function openParentDialog() {
   parentForm.reset();
+  $("#homeResults").hidden = true;
   parentDlg.showModal();
 }
+$("#setupBtn").onclick = openParentDialog;
+$("#addParentBtn").onclick = openParentDialog;
 parentForm.addEventListener("submit", async (e) => {
   if (e.submitter?.value !== "ok") return;
   e.preventDefault();
@@ -292,7 +462,7 @@ parentForm.addEventListener("submit", async (e) => {
     });
     parentDlg.close();
     toast("등록했어요");
-    refresh();
+    refresh(true);
   } catch (err) { toast(err.message); }
 });
 
@@ -312,7 +482,7 @@ bindPlaceSearch(schedForm, $("#placeResults"), (p) => {
 $("#addSchedBtn").onclick = () => openScheduleDialog();
 
 const toLocalInput = (iso) => new Intl.DateTimeFormat("sv-SE", {
-  timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
 }).format(new Date(iso)).replace(" ", "T");
 
 function fillFromDraft(d) {
@@ -335,7 +505,7 @@ function fillFromDraft(d) {
   schedKind = d.kind || "기타";
   for (const b of $("#kindSeg").children) b.classList.toggle("on", b.dataset.v === schedKind);
   const missing = d.missing.filter((m) => m !== "장소 위치");
-  toast(missing.length ? `${missing.join(", ")}을(를) 채워 주세요` : "채웠어요. 확인 후 저장해 주세요");
+  toast(missing.length ? `${missing.join(", ")}을(를) 채워 주세요` : "채웠어요. 확인하고 저장해 주세요");
 }
 
 $("#parseBtn").onclick = async () => {
@@ -354,7 +524,8 @@ function openScheduleDialog(parentId) {
   if (!state?.parents.length) return openParentDialog();
   schedForm.reset();
   schedForm.draft_id.value = "";
-  $("#placeResults").style.display = "none";
+  $("#placeResults").hidden = true;
+  $("#pasteBox").open = false;
   const who = $("#whoSeg");
   schedWho = parentId ?? state.parents[0].id;
   who.innerHTML = state.parents.map((p) => `<button type="button" data-v="${p.id}" class="${p.id === schedWho ? "on" : ""}">${esc(p.name)}</button>`).join("");
@@ -364,6 +535,8 @@ function openScheduleDialog(parentId) {
     schedWho = Number(b.dataset.v);
     for (const x of who.children) x.classList.toggle("on", x === b);
   };
+  schedKind = "병원";
+  for (const b of $("#kindSeg").children) b.classList.toggle("on", b.dataset.v === schedKind);
   schedDlg.showModal();
 }
 schedForm.addEventListener("submit", async (e) => {
@@ -382,7 +555,8 @@ schedForm.addEventListener("submit", async (e) => {
     if (!r) return;
     schedDlg.close();
     toast("일정을 저장했어요");
-    refresh();
+    showView("home");
+    refresh(true);
   } catch (err) { toast(err.message); }
 });
 
@@ -391,8 +565,9 @@ $("#scenario").addEventListener("click", async (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   await api("POST", "/api/simulator/scenario", { scenario: b.dataset.v });
-  refresh();
+  refresh(true);
 });
 
-refresh();
+paintIcons();
+refresh(true);
 setInterval(refresh, 2500);

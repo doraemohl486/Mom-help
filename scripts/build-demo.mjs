@@ -32,7 +32,7 @@ const bundle = result.outputFiles[0].text;
 
 const read = (p) => fs.readFileSync(r(p), "utf8");
 const guardianHtml = read("public/guardian.html");
-const guardianBody = guardianHtml.slice(guardianHtml.indexOf('<div class="wrap">'), guardianHtml.indexOf('<script src="/guardian.js">'));
+const guardianBody = guardianHtml.slice(guardianHtml.indexOf('<div class="g-app"'), guardianHtml.indexOf('<script src="/icons.js">'));
 // 체험판 틀이 이름을 보여 주므로 자녀 화면의 큰 제목 줄은 그대로 둔다
 
 const inlineJs = (js) => js.replace(/<\/script/gi, "<\\/script");
@@ -40,6 +40,7 @@ let html = read("scripts/demo-shell.html")
   .replace("/*__STYLE__*/", () => read("public/style.css"))
   .replace("<!--__GUARDIAN__-->", () => guardianBody)
   .replace("/*__BUNDLE__*/", () => inlineJs(bundle))
+  .replace("/*__ICONS_JS__*/", () => inlineJs(read("public/icons.js")))
   .replace("/*__GUARDIAN_JS__*/", () => inlineJs(read("public/guardian.js")))
   .replace("/*__PARENT_JS__*/", () => inlineJs(read("public/parent.js")))
   .replace("/*__SHELL_JS__*/", () => inlineJs(read("scripts/demo-shell.js")));
