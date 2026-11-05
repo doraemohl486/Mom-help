@@ -62,7 +62,7 @@
       <h2 class="sec">부모님</h2>
       <div id="parents" class="stack"></div>
       <button class="btn" type="button" id="addParentBtn">부모님 추가</button>
-      <h2 class="sec">병원 예약 문자 자동으로 가져오기</h2>
+      <h2 class="sec">예약·약속 문자 자동으로 가져오기</h2>
       <div class="card" id="inboxBox"></div>
     </section>
 
@@ -101,6 +101,9 @@
 <dialog id="parentDlg">
   <form id="parentForm" method="dialog">
     <div class="sheet-head"><h3>부모님 정보</h3></div>
+    <label>아이콘</label>
+    <div class="avatar-pick" id="avatarPick" role="radiogroup" aria-label="아이콘 고르기"></div>
+    <input type="hidden" name="avatar" />
     <label for="pname">호칭</label>
     <div class="seg" id="pNameSeg"><button type="button" data-v="엄마">엄마</button><button type="button" data-v="아빠">아빠</button></div>
     <input id="pname" class="gap-top" name="pname" placeholder="예: 엄마" required />
@@ -130,6 +133,18 @@
   </form>
 </dialog>
 
+<!-- 아이콘 바꾸기 -->
+<dialog id="avatarDlg">
+  <div class="sheet">
+    <div class="sheet-head"><h3 id="avatarTitle">아이콘 바꾸기</h3></div>
+    <div class="avatar-pick gap-top" id="avatarPick2" role="radiogroup" aria-label="아이콘 고르기"></div>
+    <div class="sheet-actions">
+      <button class="btn" type="button" id="avatarCancel">취소</button>
+      <button class="btn primary" type="button" id="avatarSave">바꾸기</button>
+    </div>
+  </div>
+</dialog>
+
 <!-- 일정 추가 -->
 <dialog id="schedDlg">
   <form id="schedForm" method="dialog">
@@ -137,30 +152,32 @@
     <label>누구 일정이에요?</label>
     <div class="seg" id="whoSeg"></div>
     <details class="paste" id="pasteBox">
-      <summary><span data-ic="sms"></span>병원 예약 문자 붙여넣기 <span class="muted">· 알아서 채워 드려요</span></summary>
-      <textarea id="smsText" name="smsText" rows="4" placeholder="[OO병원] 김영희님 11/12(목) 10:30 정형외과 진료 예약..."></textarea>
+      <summary><span data-ic="sms"></span>예약·약속 문자 붙여넣기 <span class="muted">· 알아서 채워 드려요</span></summary>
+      <textarea id="smsText" name="smsText" rows="4" placeholder="예약 안내, 모임 공지, 청첩장 문자 등을 붙여 넣어 주세요"></textarea>
       <button type="button" class="btn dark small gap-top" id="parseBtn">자동으로 채우기</button>
     </details>
     <input type="hidden" name="draft_id" />
     <label for="title">무슨 일정?</label>
-    <input id="title" name="title" placeholder="예: 무릎 정기검진" required />
-    <label>종류</label>
+    <input id="title" name="title" placeholder="예: 동창 모임, 장보기, 정기검진" required />
+    <label>종류 <span class="muted">· 안 골라도 알아서 정해요</span></label>
     <div class="seg" id="kindSeg">
-      <button type="button" data-v="병원" class="on">병원</button><button type="button" data-v="모임">모임</button>
-      <button type="button" data-v="경조사">경조사</button><button type="button" data-v="기타">기타</button>
+      <button type="button" data-v="모임">모임</button><button type="button" data-v="장보기">장보기</button>
+      <button type="button" data-v="병원">병원</button><button type="button" data-v="경조사">경조사</button>
+      <button type="button" data-v="종교">종교</button><button type="button" data-v="운동·취미">운동·취미</button>
+      <button type="button" data-v="기타">기타</button>
     </div>
     <label for="start_local">언제?</label>
     <input id="start_local" type="datetime-local" name="start_local" required />
     <label for="placeQuery">어디?</label>
     <div class="search-row">
-      <input id="placeQuery" name="placeQuery" placeholder="병원·장소 이름 또는 주소" autocomplete="off" enterkeyhint="search" />
+      <input id="placeQuery" name="placeQuery" placeholder="가는 곳 이름 또는 주소" autocomplete="off" enterkeyhint="search" />
       <button type="button" class="btn dark" data-search>검색</button>
     </div>
     <div class="results" id="placeResults" hidden></div>
     <input id="place_name" class="gap-top" name="place_name" placeholder="검색해서 골라 주세요" readonly required />
     <input type="hidden" name="place_address" /><input type="hidden" name="place_lat" /><input type="hidden" name="place_lng" />
     <label for="memo">메모 (알림에 같이 보내요)</label>
-    <input id="memo" name="memo" placeholder="예: 공복으로 가셔야 해요" />
+    <input id="memo" name="memo" placeholder="예: 선물 챙기기, 공복으로 가기" />
     <p class="form-error" role="alert" hidden></p>
     <div class="sheet-actions">
       <button class="btn" value="cancel" formnovalidate>취소</button>

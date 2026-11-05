@@ -29,8 +29,8 @@ export function openMemDb(initial?: Tables): { db: Db; dump: () => Tables } {
   const db = {
     raw: null,
 
-    createParent(p: Omit<Parent, "id" | "token" | "real_name"> & { real_name?: string }): Parent {
-      const row: Parent = { ...p, real_name: p.real_name ?? "", id: id(), token: randomToken() };
+    createParent(p: Omit<Parent, "id" | "token" | "real_name" | "avatar"> & { real_name?: string; avatar?: string }): Parent {
+      const row: Parent = { ...p, real_name: p.real_name ?? "", avatar: p.avatar ?? "", id: id(), token: randomToken() };
       t.parents.push(row);
       return { ...row };
     },

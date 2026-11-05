@@ -92,7 +92,7 @@ async function load() {
   const s = data.current;
   const call = s?.calls?.[s.calls.length - 1];
   // 화면이 바뀌었을 때만 다시 그림 (버튼 누르는 중 깜빡임 방지)
-  const key = JSON.stringify([data.parent.name, s?.id, s?.status, s?.taxi_call_at, call?.status, call?.car_number,
+  const key = JSON.stringify([data.parent.name, data.parent.avatar, s?.id, s?.status, s?.taxi_call_at, call?.status, call?.car_number,
     data.upcoming.map((u) => u.id), Math.floor(nowDate().getTime() / 60000)]);
   if (key !== lastKey) {
     lastKey = key;
@@ -129,7 +129,8 @@ const HOME_BOTTOM = `
   <button class="bigbtn ghost" id="addSched" type="button" data-voice="add">${ic("edit")}일정 알려주기</button>`;
 
 function shell(main, foot = true) {
-  frame({ sub: longDay.format(nowDate()), title: `${esc(data.parent.name)}, 안녕하세요`, main, bottom: foot ? HOME_BOTTOM : "" });
+  const face = data.parent.avatar ? `<span class="hello-face" aria-hidden="true">${esc(data.parent.avatar)}</span>` : "";
+  frame({ sub: longDay.format(nowDate()), title: `${face}${esc(data.parent.name)}, 안녕하세요`, main, bottom: foot ? HOME_BOTTOM : "" });
   const b = document.getElementById("addSched");
   if (b) b.onclick = () => openInput();
   const c = document.getElementById("openCal");
@@ -161,9 +162,9 @@ const whenSay = (s) => `${dayWord(new Date(s.start_at))} ${time.format(new Date(
 function render() {
   const s = data.current;
   if (!s) {
-    sayText = "예정된 일정이 없어요. 병원 예약이 생기면 일정 알려주기를 눌러 주세요.";
+    sayText = "예정된 일정이 없어요. 약속이나 갈 곳이 생기면 일정 알려주기를 눌러 주세요.";
     shell(`<div class="card status"><div class="big-ic ok">${ic("check")}</div><h2>예정된 일정이 없어요</h2>
-      <p>병원 예약이 생기면<br>아래 '일정 알려주기'를 눌러 주세요.</p></div>`);
+      <p>약속이나 갈 곳이 생기면<br>아래 '일정 알려주기'를 눌러 주세요.</p></div>`);
     return;
   }
   const call = s.calls[s.calls.length - 1];
@@ -359,7 +360,7 @@ function voiceRoot() {
 /** 지금 화면에서 할 수 있는 말 예시 */
 function voiceExamples() {
   const root = voiceRoot();
-  if (root.querySelector("[data-voice-any]")) return ["다음주 화요일 오전 10시 서울대병원", "돌아가"];
+  if (root.querySelector("[data-voice-any]")) return [INPUT_EXAMPLES[0], INPUT_EXAMPLES[1], "돌아가"];
   // 화면의 주된 행동을 먼저, 공통 버튼(다시 듣기·달력·일정)은 뒤에
   const later = ["repeat", "calendar", "add", "back"];
   const keys = [...root.querySelectorAll("[data-voice]")].map((b) => b.dataset.voice.split(" ")[0]);
@@ -496,14 +497,24 @@ function inputShell(main, bottom = "") {
   if (bar && bar.children.length === 1) bar.classList.add("one");
 }
 
+// 말하기 예시: 병원만이 아니라 여러 곳
+const INPUT_EXAMPLES = [
+  "토요일 낮 12시 종로에서 동창 모임",
+  "내일 오전 10시 서울대병원",
+  "수요일 오후 2시 복지관 노래교실",
+  "모레 오후 3시 망원시장 장보기",
+  "일요일 오전 11시 명동성당",
+];
+
 function openInput(message) {
   mode = "input";
-  sayText = "언제, 어디 가세요? 말하기 버튼을 누르고 말씀해 주세요. 예를 들면, 다음주 화요일 오전 10시 서울대병원.";
+  const ex = INPUT_EXAMPLES[Math.floor(Math.random() * INPUT_EXAMPLES.length)];
+  sayText = `언제, 어디 가세요? 말하기 버튼을 누르고 말씀해 주세요. 예를 들면, ${ex}.`;
   inputShell(`
     <p class="question">언제, 어디 가세요?</p>
-    <p class="p-reason">${esc(typeof message === "string" ? message : "예) 다음주 화요일 오전 10시 서울대병원")}</p>
+    <p class="p-reason">${esc(typeof message === "string" ? message : `예) ${ex}`)}</p>
     <button class="bigbtn tall" type="button" data-mic>${ic("mic")}<span>눌러서 말하기</span></button>
-    <div class="p-input"><textarea id="txt" aria-label="일정 내용" placeholder="여기에 써도 돼요. 병원 문자를 붙여 넣어도 돼요."></textarea></div>`,
+    <div class="p-input"><textarea id="txt" aria-label="일정 내용" placeholder="여기에 써도 돼요. 받은 문자를 붙여 넣어도 돼요."></textarea></div>`,
   `<button class="bigbtn ghost" id="back" type="button" data-voice="back">${ic("back")}돌아가기</button>
    <button class="bigbtn" id="send" type="button" data-voice-any>${ic("check")}알려주기</button>`);
   const txt = document.getElementById("txt");

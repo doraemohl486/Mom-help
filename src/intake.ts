@@ -4,6 +4,7 @@ import type { Notifier } from "./notify.ts";
 import type { TripFlow } from "./flow.ts";
 import type { AppointmentParser } from "./parse.ts";
 import { searchExactPlaces } from "./places.ts";
+import { guessKind } from "./parse.ts";
 import { formatDate, formatTime, fromSeoulLocal, iGa } from "./time.ts";
 
 export interface Conflict {
@@ -93,7 +94,8 @@ export class Intake {
     }
     const startAt = p.date && p.time ? fromSeoulLocal(`${p.date}T${p.time}`).toISOString() : null;
     return this.db.createDraft({
-      parent_id: parentId, source, raw_text: raw, title: p.title || p.place_name || "일정", kind: p.kind,
+      parent_id: parentId, source, raw_text: raw, title: p.title || p.place_name || "일정",
+      kind: p.kind !== "기타" ? p.kind : guessKind(`${p.title} ${place.name}`),
       place_name: place.name, place_address: place.address, place_lat: place.lat, place_lng: place.lng,
       start_at: startAt, memo: p.memo, status: source === "sms" ? "review" : "pending", // 부모님·자녀 입력은 그 화면에서 바로 확인
     });

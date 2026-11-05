@@ -56,7 +56,7 @@ setInterval(save, 1500);
 function seed() {
   if (db.listParents().length) return;
   const p = db.createParent({
-    name: "엄마", real_name: "김영희", phone: "010-1234-5678", home_address: "서울 마포구 월드컵로 212 (마포구청)",
+    name: "엄마", real_name: "김영희", avatar: "👵", phone: "010-1234-5678", home_address: "서울 마포구 월드컵로 212 (마포구청)",
     home_lat: 37.5663, home_lng: 126.9019, preferred_mode: null, notes: "지팡이를 쓰세요",
   });
   const tomorrow = seoulDateKey(new Date(Date.now() + 86400_000));
@@ -64,7 +64,17 @@ function seed() {
     parent_id: p.id, title: "무릎 정기검진", kind: "병원", place_name: "세브란스병원", place_address: "서울 서대문구 연세로 50-1",
     place_lat: 37.5622, place_lng: 126.941, start_at: fromSeoulLocal(`${tomorrow}T10:30`).toISOString(), memo: "공복으로 가셔야 해요",
   });
-  void flow.plan(s.id).then(() => flow.tickOne(s.id)).then(save);
+  const sat = (() => {
+    // 다가오는 토요일 (내일이 토요일이면 그다음 주)
+    const d = new Date(Date.now() + 2 * 86400_000);
+    while (new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "Asia/Seoul" }).format(d) !== "Sat") d.setTime(d.getTime() + 86400_000);
+    return seoulDateKey(d);
+  })();
+  const s2 = db.createSchedule({
+    parent_id: p.id, title: "초등학교 동창 모임", kind: "모임", place_name: "종로구 탑골공원", place_address: "서울 종로구 종로 99",
+    place_lat: 37.5711, place_lng: 126.9882, start_at: fromSeoulLocal(`${sat}T12:00`).toISOString(), memo: "회비 3만 원",
+  });
+  void flow.plan(s.id).then(() => flow.plan(s2.id)).then(() => flow.tickOne(s.id)).then(save);
 }
 seed();
 

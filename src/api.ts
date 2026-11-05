@@ -7,6 +7,7 @@ import type { SimulatorProvider } from "./call/simulator.ts";
 import { searchPlaces } from "./places.ts";
 import { ConflictError, IncompleteError, type Intake } from "./intake.ts";
 import { fromSeoulLocal } from "./time.ts";
+import { guessKind } from "./parse.ts";
 
 /**
  * API 라우트 정의. Express 서버(src/app.ts)와 브라우저 체험판(src/demo)이 같은 코드를 쓴다.
@@ -40,6 +41,7 @@ export const ModeZ = z.enum(["taxi", "transit", "family"]);
 const ParentZ = z.object({
   name: z.string().min(1).max(20),
   real_name: z.string().max(20).default(""),
+  avatar: z.string().max(16).default(""),
   phone: z.string().regex(/^0\d{1,2}-?\d{3,4}-?\d{4}$/, "전화번호 형식을 확인해 주세요"),
   home_address: z.string().min(2),
   home_lat: z.number().min(33).max(39),
@@ -50,7 +52,7 @@ const ParentZ = z.object({
 const ScheduleZ = z.object({
   parent_id: z.number().int(),
   title: z.string().min(1).max(50),
-  kind: z.string().max(10).default("기타"),
+  kind: z.string().max(10).default(""), // 비우면 제목·장소로 알아서 고름
   place_name: z.string().min(1),
   place_address: z.string().min(1),
   place_lat: z.number().min(33).max(39),
@@ -114,7 +116,11 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
     return reply(201, db.createParent(ParentZ.parse(req.body)));
   });
   r("PUT", "/api/parents/:id", async (req) => {
-    const p = db.updateParent(Number(req.params.id), ParentZ.partial().parse(req.body));
+    // 보낸 칸만 바꾼다 (partial()이 기본값을 채워 넣어 다른 칸을 지우지 않게)
+    const parsed = ParentZ.partial().parse(req.body);
+    const sent = new Set(Object.keys(req.body ?? {}));
+    const fields = Object.fromEntries(Object.entries(parsed).filter(([k]) => sent.has(k)));
+    const p = db.updateParent(Number(req.params.id), fields);
     if (!p) return reply(404, { error: "부모님 정보를 찾을 수 없어요." });
     return reply(200, p);
   });
@@ -127,8 +133,9 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
     const { start_local, force, draft_id, ...rest } = ScheduleZ.parse(req.body);
     if (!db.getParent(rest.parent_id)) return reply(400, { error: "부모님을 먼저 등록해 주세요." });
     const draft = draft_id ? db.getDraft(draft_id) : undefined;
+    const kind = rest.kind || guessKind(`${rest.title} ${rest.place_name}`);
     const s = await intake.createSchedule(
-      { ...rest, start_at: fromSeoulLocal(start_local).toISOString(), source: draft?.source ?? "guardian" }, force);
+      { ...rest, kind, start_at: fromSeoulLocal(start_local).toISOString(), source: draft?.source ?? "guardian" }, force);
     if (draft) db.updateDraft(draft.id, { status: "accepted", schedule_id: s.id });
     return reply(201, scheduleView(s));
   });
@@ -204,7 +211,7 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
     if (!p) return reply(404, { error: "링크가 올바르지 않아요." });
     const upcoming = db.listSchedulesForParent(p.id, since()).filter((s) => s.status !== "arrived");
     return reply(200, {
-      parent: { name: p.name },
+      parent: { name: p.name, avatar: p.avatar },
       current: upcoming[0] ? scheduleView(upcoming[0]) : null,
       upcoming: upcoming.slice(1, 4).map((s) => ({ id: s.id, title: s.title, place_name: s.place_name, start_at: s.start_at })),
       notifications: db.listNotifications("parent", p.id, 5),

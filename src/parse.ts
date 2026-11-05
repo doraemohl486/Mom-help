@@ -11,9 +11,9 @@ import { fromSeoulLocal, seoulDateKey } from "./time.ts";
  */
 export const ParsedAppointment = z.object({
   is_appointment: z.boolean().describe("약속·예약 일정이 맞으면 true. 광고·결제·인증번호 문자면 false"),
-  title: z.string().describe("짧은 일정 이름 (예: 정형외과 진료). 모르면 빈 문자열"),
-  kind: z.enum(["병원", "모임", "경조사", "기타"]),
-  place_name: z.string().describe("장소 이름 (예: 세브란스병원). 모르면 빈 문자열"),
+  title: z.string().describe("짧은 일정 이름 (예: 동창 모임, 정형외과 진료, 장보기). 모르면 빈 문자열"),
+  kind: z.enum(["병원", "모임", "경조사", "장보기", "종교", "운동·취미", "기타"]),
+  place_name: z.string().describe("장소 이름 (예: 종로 OO식당, 망원시장, 세브란스병원). 모르면 빈 문자열"),
   date: z.string().describe("YYYY-MM-DD. 모르면 빈 문자열"),
   time: z.string().describe("24시간 HH:MM. 모르면 빈 문자열"),
   memo: z.string().describe("준비사항 (예: 금식, 신분증 지참, 30분 전 도착). 없으면 빈 문자열"),
@@ -35,8 +35,8 @@ function todayLine(now: Date): string {
 
 // ---------------------------------------------------------------------------
 
-const SYSTEM = `당신은 어르신 일정 앱의 입력 도우미입니다. 사용자가 준 글은 병원·기관의 예약 안내 문자이거나,
-어르신이 말로 알려 준 일정입니다. 글에서 일정 정보만 뽑아 주세요.
+const SYSTEM = `당신은 어르신 일정 앱의 입력 도우미입니다. 사용자가 준 글은 병원·기관의 예약 안내 문자, 모임·경조사 초대 문자,
+또는 어르신이 말로 알려 준 일정(장보기, 성당·교회, 복지관 수업, 친구 만남 등)입니다. 글에서 일정 정보만 뽑아 주세요.
 - 상대적인 날짜("내일", "다음주 화요일")는 오늘 날짜를 기준으로 계산합니다.
 - 연도가 없으면 오늘 이후 가장 가까운 날짜로 정합니다.
 - "오전/오후" 없이 1~6시라고만 하면 오후로 봅니다 (병원 진료 시간 기준).
@@ -74,7 +74,7 @@ const KOREAN_NUM: Record<string, number> = {
   한: 1, 두: 2, 세: 3, 네: 4, 다섯: 5, 여섯: 6, 일곱: 7, 여덟: 8, 아홉: 9, 열: 10, 열한: 11, 열두: 12,
 };
 
-const PLACE_RE = /([가-힣A-Za-z0-9]+(?:대학교병원|대학병원|병원|의원|한의원|치과|클리닉|보건소|약국|센터|복지관|구청|주민센터|성당|교회|예식장|장례식장))/;
+const PLACE_RE = /([가-힣A-Za-z0-9]+(?:대학교병원|대학병원|병원|의원|한의원|치과|클리닉|보건소|약국|센터|복지관|경로당|구청|시청|주민센터|성당|교회|사찰|예식장|웨딩홀|컨벤션|장례식장|공원|시장|마트|백화점|식당|도서관|체육관|수영장))/;
 
 function addDays(key: string, n: number): string {
   const d = fromSeoulLocal(`${key}T12:00`);
@@ -138,6 +138,17 @@ export function parseTime(text: string): string {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
+/** 글이나 장소 이름으로 일정 종류 고르기 (병원만이 아니라 여러 곳) */
+export function guessKind(text: string): ParsedAppointment["kind"] {
+  if (/(결혼|예식|장례|빈소|발인|돌잔치|칠순|팔순|환갑|생신)/.test(text)) return "경조사";
+  if (/(병원|의원|치과|한의원|클리닉|보건소|진료|검진|내시경|약국|물리치료)/.test(text)) return "병원";
+  if (/(마트|시장|백화점|장보|쇼핑|홈플러스|이마트|코스트코)/.test(text)) return "장보기";
+  if (/(교회|성당|사찰|절에|예배|미사|법회|기도)/.test(text)) return "종교";
+  if (/(모임|동창|계모임|친구|점심|저녁 ?식사|만나|회식|동호회|친척|가족)/.test(text)) return "모임";
+  if (/(복지관|경로당|노인정|체조|수영|헬스|운동|교실|강좌|수업|노래|댄스|탁구|게이트볼|등산|산책)/.test(text)) return "운동·취미";
+  return "기타";
+}
+
 export class RuleAppointmentParser implements AppointmentParser {
   readonly name = "rules";
   async parse(text: string, now: Date): Promise<ParsedAppointment> {
@@ -146,7 +157,8 @@ export class RuleAppointmentParser implements AppointmentParser {
       return { is_appointment: false, title: "", kind: "기타", place_name: "", date: "", time: "", memo: "" };
     }
     const bracket = clean.match(/\[([^\]]+)\]/)?.[1] ?? "";
-    const place = (bracket.match(PLACE_RE)?.[1] ?? clean.match(PLACE_RE)?.[1] ?? bracket).trim();
+    // [OO병원]처럼 보낸 곳이 장소면 그것, 아니면 본문에서 장소 찾기 ([동창회] 같은 머리말은 장소가 아님)
+    const place = (bracket.match(PLACE_RE)?.[1] ?? clean.replace(/\[[^\]]*\]/, " ").match(PLACE_RE)?.[1] ?? "").trim();
     const date = parseDate(clean, now);
     const time = parseTime(clean);
     const dept = clean.match(/([가-힣]{1,6}과)\s*(?:진료|외래|검사|예약)?/)?.[1];
@@ -160,8 +172,10 @@ export class RuleAppointmentParser implements AppointmentParser {
     ].filter(Boolean).join(", ");
     return {
       is_appointment: Boolean(date && time) || Boolean(place && (date || time)),
-      title: [dept, exam].filter(Boolean).join(" ") || (isHospital ? "병원 진료" : ""),
-      kind: isHospital ? "병원" : /(모임|동창|계모임)/.test(clean) ? "모임" : /(결혼|장례|돌잔치|칠순|팔순)/.test(clean) ? "경조사" : "기타",
+      title: [dept, exam].filter(Boolean).join(" ")
+        || clean.match(/([가-힣]{1,8} ?(?:모임|계모임|동창회|예배|미사|법회|결혼식|돌잔치|칠순|팔순|생신|강좌|교실|수업))/)?.[1]
+        || (isHospital ? "병원 진료" : ""),
+      kind: guessKind(clean),
       place_name: place,
       date,
       time,

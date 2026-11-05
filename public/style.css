@@ -436,3 +436,15 @@ details.more > summary { cursor: pointer; color: var(--sub); font-size: var(--t2
 .pin { border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); }
 .pin.home { background: var(--accent); }
 .pin.dest { background: var(--brand); }
+
+/* 부모님 아이콘 */
+.avatar .emoji { font-size: 1.25em; line-height: 1; }
+.avatar.lg .emoji { font-size: 28px; }
+.avatar-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: var(--s2); }
+.avatar-pick button { height: 48px; border-radius: var(--r2); border: 2px solid var(--line); background: var(--surface); font-size: var(--t5); display: grid; place-items: center; }
+.avatar-pick button.on { border-color: var(--ink); background: var(--brand-soft); }
+.avatar-pick button.letter { font-size: var(--t2); font-weight: 700; color: var(--sub); }
+.avatar-btn { position: relative; border: 0; background: none; padding: 0; }
+.avatar-edit { position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--surface); display: grid; place-items: center; font-size: 12px; border: 2px solid var(--surface); }
+
+.hello-face { font-size: 1.15em; margin-right: var(--s1); }

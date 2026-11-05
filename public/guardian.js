@@ -35,6 +35,14 @@ const NOTIF_KIND = {
   taxi_reserved: ["clock", ""], family: ["family", "warn"], chosen: ["check", ""], evening: ["bell", ""],
 };
 
+// 부모님 아이콘 (고르기)
+const AVATARS = ["👵", "👴", "🧓", "👩‍🦳", "👨‍🦳", "👩", "👨", "🌸", "🌻", "🍀", "🐶", "🐱", "☕", "⭐"];
+/** 아이콘 동그라미: 고른 아이콘, 없으면 호칭 마지막 글자 */
+function avatarHtml(p, i, cls = "") {
+  const face = p?.avatar ? `<span class="emoji">${esc(p.avatar)}</span>` : esc((p?.name ?? "").slice(-1));
+  return `<span class="avatar a${i % 3} ${cls}" title="${esc(p?.name ?? "")}">${face}</span>`;
+}
+
 let state = null;
 let lastJson = "";
 const openIds = new Set(); // 펼친 일정
@@ -159,7 +167,7 @@ function render() {
   const byId = Object.fromEntries(parents.map((p, i) => [p.id, { ...p, idx: i }]));
 
   $("#setupHint").hidden = parents.length > 0;
-  $("#famChips").innerHTML = parents.map((p, i) => `<span class="avatar a${i % 3}" title="${esc(p.name)}">${esc(p.name.slice(-1))}</span>`).join("");
+  $("#famChips").innerHTML = parents.map((p, i) => avatarHtml(p, i)).join("");
 
   // 요약 한 줄
   const live = schedules.filter((s) => !["cancelled"].includes(s.status));
@@ -200,7 +208,7 @@ function render() {
         <div class="day"><div class="day-label">${dayName(k, new Date(list[0].start_at))}</div>
           ${list.map((s) => scheduleCard(s, byId[s.parent_id], false)).join("")}</div>`).join("")
       + (done.length ? `<details class="more"><summary>끝난 일정 ${done.length}개</summary><div class="stack">${done.map((s) => scheduleCard(s, byId[s.parent_id], false)).join("")}</div></details>` : "")
-    : (parents.length && !nowList.length ? `<div class="card empty"><b>등록된 일정이 없어요</b>아래 노란 + 버튼으로 추가하거나, 병원 예약 문자를 붙여 넣어 보세요.</div>` : "");
+    : (parents.length && !nowList.length ? `<div class="card empty"><b>등록된 일정이 없어요</b>아래 노란 + 버튼으로 약속, 장보기, 병원 같은 갈 곳을 넣어 보세요.</div>` : "");
 
   // 알림
   $("#notifs").innerHTML = notifications.length
@@ -216,7 +224,7 @@ function render() {
   // 가족
   $("#parents").innerHTML = parents.map((p, i) => `
     <div class="card parent-card">
-      <span class="avatar lg a${i % 3}">${esc(p.name.slice(-1))}</span>
+      <button type="button" class="avatar-btn" onclick="openAvatarDialog(${p.id})" aria-label="${esc(p.name)} 아이콘 바꾸기">${avatarHtml(p, i, "lg")}<span class="avatar-edit">${ic("edit")}</span></button>
       <div class="stack tight">
         <div class="row between"><span class="parent-name">${esc(p.name)}${p.real_name ? ` <span class="muted">(${esc(p.real_name)})</span>` : ""}</span><span class="muted">${esc(p.phone)}</span></div>
         <div class="muted">${esc(p.home_address)}${p.notes ? `<br>참고: ${esc(p.notes)}` : ""}</div>
@@ -278,7 +286,7 @@ function renderCalendar(byId, nowList) {
     <div class="cal-grid cal-wd">${["일", "월", "화", "수", "목", "금", "토"].map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
     <div class="cal-grid cal-days">${cells.join("")}</div>
     <button type="button" class="cal-handle" data-toggle aria-expanded="${calOpen}">${ic(calOpen ? "up" : "down")}${calOpen ? "접기" : "한 달 보기"}</button>
-    ${state.parents.length > 1 ? `<div class="cal-legend">${state.parents.map((p, i) => `<span><i class="dot-p a${i % 3}"></i>${esc(p.name)}</span>`).join("")}</div>` : ""}`;
+    ${state.parents.length > 1 ? `<div class="cal-legend">${state.parents.map((p, i) => `<span><i class="dot-p a${i % 3}"></i>${p.avatar ? `${esc(p.avatar)} ` : ""}${esc(p.name)}</span>`).join("")}</div>` : ""}`;
 
   // 고른 날의 일정
   const sel = new Date(kstMidnight(selDay).getTime() + 12 * 3600000);
@@ -441,7 +449,7 @@ function scheduleCard(s, p, hero) {
         <span class="sched-title">${ic(s.kind) || ic("기타")}${esc(s.title)}</span>
         <span class="sched-place">${esc(s.place_name)}${!hero && s.memo ? ` · ${esc(s.memo)}` : ""}</span>
       </span>
-      <span class="sched-side"><span class="pill ${tone}">${label}</span><span class="who">${esc(p?.name ?? "")}</span></span>
+      <span class="sched-side"><span class="pill ${tone}">${label}</span><span class="who">${p?.avatar ? `${esc(p.avatar)} ` : ""}${esc(p?.name ?? "")}</span></span>
     </button>
     ${body}
   </div>`;
@@ -493,15 +501,15 @@ function draftCard(d, p) {
 }
 
 function inboxHelp(parents) {
-  return `<p class="muted">부모님 폰에 온 병원 예약 문자를 이 주소로 넘기면 일정이 알아서 생겨요. 같은 예약 문자가 또 오면 건너뛰고, 애매하면 '확인이 필요해요'에 올려요.</p>`
+  return `<p class="muted">부모님 폰에 온 예약·약속 문자(병원, 모임, 경조사 등)를 이 주소로 넘기면 일정이 알아서 생겨요. 같은 예약 문자가 또 오면 건너뛰고, 애매하면 '확인이 필요해요'에 올려요.</p>`
     + parents.map((p) => {
       const url = `${location.origin}/api/inbox/${p.token}`;
       return `<div class="stack tight"><b>${esc(p.name)} 폰</b><div class="mono">${esc(url)}</div>
         <div><button class="btn small" type="button" onclick="copyText('${esc(url)}')">주소 복사</button></div></div>`;
     }).join("") + `
     <details class="more"><summary>폰 설정 방법</summary><div class="stack tight">
-      <p class="muted"><b>아이폰</b> · 단축어 → 자동화 → 메시지 → '예약' 또는 '진료' 포함 → 즉시 실행 → 'URL 콘텐츠 가져오기'에 위 주소, 방법 POST, 본문에 '메시지'</p>
-      <p class="muted"><b>안드로이드</b> · 문자 웹훅 전달 앱에서 '예약'이 들어간 문자를 위 주소로 POST</p>
+      <p class="muted"><b>아이폰</b> · 단축어 → 자동화 → 메시지 → '예약'·'일정'·'초대' 포함 → 즉시 실행 → 'URL 콘텐츠 가져오기'에 위 주소, 방법 POST, 본문에 '메시지'</p>
+      <p class="muted"><b>안드로이드</b> · 문자 웹훅 전달 앱에서 '예약'·'일정'·'초대'가 들어간 문자를 위 주소로 POST</p>
     </div></details>`;
 }
 
@@ -653,8 +661,52 @@ function formError(form, msg) {
   if (msg) el.scrollIntoView({ block: "nearest" });
 }
 
+function fillAvatarPick(el, current, onPick) {
+  el.innerHTML = AVATARS.map((a) => `<button type="button" role="radio" aria-checked="${a === current}" class="${a === current ? "on" : ""}" data-a="${a}">${a}</button>`).join("")
+    + `<button type="button" role="radio" aria-checked="${!current}" class="letter ${!current ? "on" : ""}" data-a="">글자</button>`;
+  el.onclick = (e) => {
+    const b = e.target.closest("[data-a]");
+    if (!b) return;
+    for (const x of el.children) {
+      x.classList.toggle("on", x === b);
+      x.setAttribute("aria-checked", String(x === b));
+    }
+    onPick(b.dataset.a);
+  };
+}
+
+let avatarTarget = null;
+let avatarChoice = "";
+function openAvatarDialog(id) {
+  const p = state.parents.find((x) => x.id === id);
+  if (!p) return;
+  avatarTarget = id;
+  avatarChoice = p.avatar || "";
+  $("#avatarTitle").textContent = `${p.name} 아이콘 바꾸기`;
+  fillAvatarPick($("#avatarPick2"), avatarChoice, (a) => (avatarChoice = a));
+  $("#avatarDlg").showModal();
+}
+$("#avatarCancel").onclick = () => $("#avatarDlg").close();
+$("#avatarSave").onclick = async () => {
+  try {
+    await api("PUT", `/api/parents/${avatarTarget}`, { avatar: avatarChoice });
+    $("#avatarDlg").close();
+    toast("아이콘을 바꿨어요");
+    refresh(true);
+  } catch (e) { toast(e.message); }
+};
+
 function openParentDialog() {
   parentForm.reset();
+  parentForm.avatar.value = "";
+  fillAvatarPick($("#avatarPick"), "", (a) => {
+    parentForm.avatar.value = a;
+    // 아이콘으로 호칭 채워 주기 (비어 있을 때만)
+    if (!parentForm.pname.value.trim()) {
+      if (["👵", "👩‍🦳", "👩"].includes(a)) parentForm.pname.value = "엄마";
+      if (["👴", "👨‍🦳", "👨", "🧓"].includes(a)) parentForm.pname.value = "아빠";
+    }
+  });
   formError(parentForm, "");
   $("#homeResults").hidden = true;
   parentDlg.showModal();
@@ -675,7 +727,7 @@ parentForm.addEventListener("submit", async (e) => {
   }
   try {
     await api("POST", "/api/parents", {
-      name: f.pname.value.trim(), real_name: f.real_name.value.trim(), phone: f.phone.value.trim(), home_address: f.home_address.value,
+      name: f.pname.value.trim(), real_name: f.real_name.value.trim(), avatar: f.avatar.value, phone: f.phone.value.trim(), home_address: f.home_address.value,
       home_lat: Number(f.home_lat.value), home_lng: Number(f.home_lng.value),
       preferred_mode: f.preferred_mode.value || null, notes: f.notes.value.trim(),
     });
@@ -688,10 +740,14 @@ parentForm.addEventListener("submit", async (e) => {
 // ---------------- 일정 추가 ----------------
 const schedDlg = $("#schedDlg");
 const schedForm = $("#schedForm");
-let schedKind = "병원";
+let schedKind = ""; // 비워 두면 제목·장소로 알아서 고름
 let schedWho = null;
-$("#kindSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) schedKind = b.dataset.v; });
-segment($("#kindSeg"));
+$("#kindSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  schedKind = schedKind === b.dataset.v ? "" : b.dataset.v; // 다시 누르면 선택 해제
+  for (const x of $("#kindSeg").children) x.classList.toggle("on", x.dataset.v === schedKind);
+});
 bindPlaceSearch(schedForm, $("#placeResults"), (p) => {
   schedForm.place_name.value = p.name;
   schedForm.place_address.value = p.address;
@@ -757,7 +813,7 @@ function openScheduleDialog(parentId, dateKey) {
     schedWho = Number(b.dataset.v);
     for (const x of who.children) x.classList.toggle("on", x === b);
   };
-  schedKind = "병원";
+  schedKind = "";
   for (const b of $("#kindSeg").children) b.classList.toggle("on", b.dataset.v === schedKind);
   if (dateKey) schedForm.start_local.value = `${dateKey}T10:00`;
   schedDlg.showModal();

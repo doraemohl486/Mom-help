@@ -273,3 +273,59 @@ test("API: 달력은 기간 안의 일정을 지난 것까지 보여 주고, 부
     server.close();
   }
 });
+
+test("API: 아이콘만 바꾸면 다른 정보는 그대로", async () => {
+  const { svc, parent } = setup();
+  svc.db.updateParent(parent.id, { notes: "지팡이를 쓰세요", preferred_mode: "taxi" });
+  const app = createApp(svc);
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const r = await fetch(`${base}/api/parents/${parent.id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ avatar: "👵" }),
+    });
+    assert.equal(r.status, 200);
+    const p = svc.db.getParent(parent.id)!;
+    assert.equal(p.avatar, "👵");
+    assert.equal(p.real_name, "김영희");
+    assert.equal(p.notes, "지팡이를 쓰세요");
+    assert.equal(p.preferred_mode, "taxi");
+    const view = await (await fetch(`${base}/api/p/${parent.token}`)).json();
+    assert.equal(view.parent.avatar, "👵");
+  } finally {
+    server.close();
+  }
+});
+
+test("일정 종류: 병원만이 아니라 여러 곳을 알아본다", async () => {
+  const { guessKind, RuleAppointmentParser } = await import("../src/parse.ts");
+  assert.equal(guessKind("동창 모임 종로"), "모임");
+  assert.equal(guessKind("망원시장 장보기"), "장보기");
+  assert.equal(guessKind("명동성당 미사"), "종교");
+  assert.equal(guessKind("복지관 노래교실"), "운동·취미");
+  assert.equal(guessKind("조카 결혼식"), "경조사");
+  assert.equal(guessKind("세브란스병원 검진"), "병원");
+  assert.equal(guessKind("친구 집"), "모임");
+  const p = await new RuleAppointmentParser().parse("[초등학교 동창회] 11/14(토) 낮 12시 종로구 탑골공원 앞 모임", fromSeoulLocal("2026-11-05T09:00"));
+  assert.equal(p.is_appointment, true);
+  assert.equal(p.kind, "모임");
+  assert.equal(p.time, "12:00");
+  assert.match(p.title, /모임|동창회/);
+});
+
+test("직접 넣은 일정: 종류를 안 고르면 제목·장소로 정함", async () => {
+  const { svc, parent } = setup();
+  const app = createApp(svc);
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const r = await fetch(`${base}/api/schedules`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parent_id: parent.id, title: "장보기", place_name: "망원시장", place_address: "서울 마포구 망원동", place_lat: 37.556, place_lng: 126.906, start_local: "2026-11-20T15:00" }),
+    });
+    assert.equal(r.status, 201);
+    assert.equal((await r.json()).kind, "장보기");
+  } finally {
+    server.close();
+  }
+});

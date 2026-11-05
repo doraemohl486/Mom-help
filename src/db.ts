@@ -9,6 +9,7 @@ export interface Parent {
   id: number;
   name: string; // 호칭, 예: 엄마
   real_name: string; // 실명, 예: 김영희 (콜센터에 알려 줄 이름)
+  avatar: string; // 화면에 보일 아이콘 (예: 👵). 비어 있으면 호칭 글자
   phone: string;
   home_address: string;
   home_lat: number;
@@ -113,6 +114,7 @@ CREATE TABLE IF NOT EXISTS parents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   real_name TEXT NOT NULL DEFAULT '',
+  avatar TEXT NOT NULL DEFAULT '',
   phone TEXT NOT NULL,
   home_address TEXT NOT NULL,
   home_lat REAL NOT NULL,
@@ -202,7 +204,7 @@ export function openDb(file: string) {
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec(SCHEMA);
   // 예전 DB 파일에 새 칸 추가
-  for (const col of ["real_name TEXT NOT NULL DEFAULT ''@parents", "taxi_call_at TEXT@schedules", "source TEXT NOT NULL DEFAULT 'guardian'@schedules"]) {
+  for (const col of ["real_name TEXT NOT NULL DEFAULT ''@parents", "avatar TEXT NOT NULL DEFAULT ''@parents", "taxi_call_at TEXT@schedules", "source TEXT NOT NULL DEFAULT 'guardian'@schedules"]) {
     const [def, table] = col.split("@");
     try {
       db.exec(`ALTER TABLE ${table} ADD COLUMN ${def}`);
@@ -223,12 +225,12 @@ export function openDb(file: string) {
     raw: db,
 
     // ---------- parents ----------
-    createParent(p: Omit<Parent, "id" | "token" | "real_name"> & { real_name?: string }): Parent {
+    createParent(p: Omit<Parent, "id" | "token" | "real_name" | "avatar"> & { real_name?: string; avatar?: string }): Parent {
       const token = crypto.randomBytes(12).toString("base64url");
       const r = run(
-        `INSERT INTO parents (name, real_name, phone, home_address, home_lat, home_lng, preferred_mode, notes, token)
-         VALUES (?,?,?,?,?,?,?,?,?)`,
-        p.name, p.real_name ?? "", p.phone, p.home_address, p.home_lat, p.home_lng, p.preferred_mode, p.notes, token,
+        `INSERT INTO parents (name, real_name, avatar, phone, home_address, home_lat, home_lng, preferred_mode, notes, token)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        p.name, p.real_name ?? "", p.avatar ?? "", p.phone, p.home_address, p.home_lat, p.home_lng, p.preferred_mode, p.notes, token,
       );
       return this.getParent(Number(r.lastInsertRowid))!;
     },
@@ -237,8 +239,8 @@ export function openDb(file: string) {
       if (!cur) return undefined;
       const n = { ...cur, ...p };
       run(
-        `UPDATE parents SET name=?, real_name=?, phone=?, home_address=?, home_lat=?, home_lng=?, preferred_mode=?, notes=? WHERE id=?`,
-        n.name, n.real_name, n.phone, n.home_address, n.home_lat, n.home_lng, n.preferred_mode, n.notes, id,
+        `UPDATE parents SET name=?, real_name=?, avatar=?, phone=?, home_address=?, home_lat=?, home_lng=?, preferred_mode=?, notes=? WHERE id=?`,
+        n.name, n.real_name, n.avatar, n.phone, n.home_address, n.home_lat, n.home_lng, n.preferred_mode, n.notes, id,
       );
       return this.getParent(id);
     },
