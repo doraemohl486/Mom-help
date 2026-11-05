@@ -1,0 +1,88 @@
+:root {
+  --bg: #f6f4ef;
+  --card: #ffffff;
+  --ink: #1d1d1f;
+  --sub: #6b6b70;
+  --line: #e4e1da;
+  --brand: #ff7a3d;
+  --brand-ink: #ffffff;
+  --ok: #1f9d55;
+  --warn: #d97706;
+  --bad: #dc2626;
+  --radius: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+
+/* ---------------- 공통 ---------------- */
+.wrap { max-width: 560px; margin: 0 auto; padding: 16px 16px 80px; }
+header.top { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 16px; }
+header.top h1 { font-size: 22px; margin: 0; }
+header.top h1 span { color: var(--brand); }
+.card { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; border: 1px solid var(--line); }
+.muted { color: var(--sub); font-size: 14px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row.between { justify-content: space-between; }
+.pill { display: inline-block; font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #f0eee9; color: var(--sub); }
+.pill.ok { background: #e3f6eb; color: var(--ok); }
+.pill.warn { background: #fdf0dc; color: var(--warn); }
+.pill.bad { background: #fde4e4; color: var(--bad); }
+.pill.brand { background: #ffe9de; color: #c2490f; }
+.btn { border: 0; border-radius: 12px; padding: 10px 14px; background: #efece6; color: var(--ink); }
+.btn.primary { background: var(--brand); color: var(--brand-ink); }
+.btn.small { padding: 6px 10px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: default; }
+h2 { font-size: 16px; margin: 20px 0 8px; color: var(--sub); font-weight: 600; }
+label { display: block; font-size: 13px; color: var(--sub); margin: 10px 0 4px; }
+input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 14px; }
+.seg button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.results { border: 1px solid var(--line); border-radius: 10px; margin-top: 4px; max-height: 200px; overflow: auto; }
+.results div { padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.results div:hover { background: #faf8f4; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 12px; display: none; z-index: 9; }
+dialog { border: 0; border-radius: var(--radius); padding: 20px; width: min(520px, 92vw); }
+dialog::backdrop { background: rgba(0,0,0,.35); }
+
+/* ---------------- 자녀 화면 ---------------- */
+.sched .when { font-weight: 700; }
+.sched .where { font-size: 15px; }
+.timeline { list-style: none; padding: 0; margin: 12px 0 0; border-left: 2px solid var(--line); }
+.timeline li { padding: 2px 0 8px 12px; position: relative; font-size: 14px; }
+.timeline li::before { content: ""; position: absolute; left: -6px; top: 7px; width: 10px; height: 10px; border-radius: 50%; background: var(--brand); }
+.timeline time { color: var(--sub); font-size: 12px; margin-right: 6px; }
+.options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+.options .opt { border: 1px solid var(--line); border-radius: 12px; padding: 8px; font-size: 13px; background: #fff; text-align: left; }
+.options .opt.rec { border-color: var(--brand); background: #fff6f1; }
+.transcript { background: #faf8f4; border-radius: 10px; padding: 10px; font-size: 13px; margin-top: 8px; max-height: 220px; overflow: auto; }
+.transcript p { margin: 4px 0; }
+.transcript .ai { color: #c2490f; }
+.notif { font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.notif:last-child { border-bottom: 0; }
+
+/* ---------------- 부모님 간편 화면 ---------------- */
+body.big { font-size: 24px; }
+body.big .wrap { padding: 20px 18px 60px; }
+.big .hello { font-size: 22px; color: var(--sub); margin: 8px 0; }
+.big .appt { font-size: 30px; font-weight: 800; line-height: 1.35; margin: 4px 0 18px; }
+.big .appt small { display: block; font-size: 22px; font-weight: 600; color: var(--sub); }
+.big .question { font-size: 30px; font-weight: 800; margin: 18px 0 12px; }
+.choice { display: block; width: 100%; text-align: left; border: 2px solid var(--line); background: #fff; border-radius: 20px; padding: 18px 20px; margin-bottom: 14px; min-height: 96px; }
+.choice .t { font-size: 30px; font-weight: 800; }
+.choice .d { font-size: 21px; color: var(--sub); margin-top: 4px; }
+.choice.rec { border-color: var(--brand); background: #fff6f1; }
+.choice .badge { float: right; font-size: 18px; background: var(--brand); color: #fff; border-radius: 999px; padding: 4px 12px; }
+.bigbtn { display: block; width: 100%; font-size: 26px; font-weight: 800; padding: 22px; border-radius: 20px; border: 0; margin-top: 12px; background: var(--brand); color: #fff; text-decoration: none; text-align: center; }
+.bigbtn.ghost { background: #efece6; color: var(--ink); }
+.car { text-align: center; padding: 24px 12px; }
+.car .plate { font-size: 44px; font-weight: 900; letter-spacing: 2px; margin: 12px 0 6px; background: #fff; border: 4px solid var(--ink); border-radius: 14px; padding: 8px 4px; }
+.car .eta { font-size: 30px; font-weight: 800; color: var(--brand); }
+.spinner { width: 64px; height: 64px; border: 8px solid #f3d6c7; border-top-color: var(--brand); border-radius: 50%; margin: 24px auto; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.reason { font-size: 21px; color: var(--sub); margin: 0 0 12px; }

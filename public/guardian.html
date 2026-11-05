@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>엄빠어디가야</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>엄빠<span>어디가야</span></h1>
+    <button class="btn primary" id="addSchedBtn">+ 일정 추가</button>
+  </header>
+
+  <div id="setupHint" class="card" style="display:none">
+    <b>먼저 부모님을 등록해 주세요.</b>
+    <p class="muted">집 주소와 휴대폰 번호가 있어야 알림을 보내고 택시를 부를 수 있어요.</p>
+    <button class="btn primary" onclick="openParentDialog()">부모님 등록</button>
+  </div>
+
+  <h2>일정</h2>
+  <div id="schedules"></div>
+
+  <h2>알림</h2>
+  <div class="card" id="notifs"><span class="muted">아직 알림이 없어요.</span></div>
+
+  <h2>부모님</h2>
+  <div id="parents"></div>
+  <button class="btn" onclick="openParentDialog()">+ 부모님 추가</button>
+
+  <h2>개발·데모</h2>
+  <div class="card">
+    <div class="row between">
+      <span>전화 연결 방식: <b id="provider"></b></span>
+    </div>
+    <div id="simBox" style="display:none">
+      <label>가상 콜센터 상황</label>
+      <div class="seg" id="scenario">
+        <button data-v="normal">정상 배차</button>
+        <button data-v="ivr">ARS 메뉴 거침</button>
+        <button data-v="no_car">배차 불가</button>
+      </div>
+      <p class="muted">시뮬레이터 모드에서는 실제 전화를 걸지 않고 가상 콜센터와 대화해요.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 부모님 등록 -->
+<dialog id="parentDlg">
+  <form id="parentForm" method="dialog">
+    <h3 style="margin-top:0">부모님 정보</h3>
+    <label>호칭</label>
+    <div class="seg" id="pNameSeg"><button type="button" data-v="엄마">엄마</button><button type="button" data-v="아빠">아빠</button></div>
+    <input name="pname" placeholder="예: 엄마" required style="margin-top:6px" />
+    <label>성함 (콜센터에 알려 드릴 이름)</label>
+    <input name="real_name" placeholder="예: 김영희" required />
+    <label>휴대폰 번호 (배차 문자를 받을 번호)</label>
+    <input name="phone" placeholder="010-1234-5678" required />
+    <label>집 주소 (택시 출발지)</label>
+    <input name="placeQuery" placeholder="주소나 아파트 이름 검색" autocomplete="off" />
+    <div class="results" id="homeResults" style="display:none"></div>
+    <input name="home_address" placeholder="선택한 주소" readonly required />
+    <input type="hidden" name="home_lat" /><input type="hidden" name="home_lng" />
+    <label>평소 좋아하시는 교통수단</label>
+    <select name="preferred_mode">
+      <option value="">상관없음</option><option value="taxi">택시</option><option value="transit">버스·지하철</option>
+    </select>
+    <label>콜센터에 전할 참고사항</label>
+    <input name="notes" placeholder="예: 지팡이를 쓰세요. 아파트 정문에서 기다리세요." />
+    <div class="row" style="justify-content:flex-end; margin-top:16px">
+      <button class="btn" value="cancel" formnovalidate>취소</button>
+      <button class="btn primary" id="parentSave" value="ok">저장</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 일정 추가 -->
+<dialog id="schedDlg">
+  <form id="schedForm" method="dialog">
+    <h3 style="margin-top:0">일정 추가</h3>
+    <label>누구?</label>
+    <div class="seg" id="whoSeg"></div>
+    <label>무슨 일정?</label>
+    <input name="title" placeholder="예: 무릎 정기검진" required />
+    <label>종류</label>
+    <div class="seg" id="kindSeg">
+      <button type="button" data-v="병원" class="on">병원</button><button type="button" data-v="모임">모임</button>
+      <button type="button" data-v="경조사">경조사</button><button type="button" data-v="기타">기타</button>
+    </div>
+    <label>언제?</label>
+    <input type="datetime-local" name="start_local" required />
+    <label>어디?</label>
+    <input name="placeQuery" placeholder="병원·장소 이름 검색" autocomplete="off" />
+    <div class="results" id="placeResults" style="display:none"></div>
+    <input name="place_name" placeholder="선택한 장소" readonly required />
+    <input type="hidden" name="place_address" /><input type="hidden" name="place_lat" /><input type="hidden" name="place_lng" />
+    <label>메모 (알림에 같이 보내요)</label>
+    <input name="memo" placeholder="예: 공복으로 가셔야 해요" />
+    <div class="row" style="justify-content:flex-end; margin-top:16px">
+      <button class="btn" value="cancel" formnovalidate>취소</button>
+      <button class="btn primary" value="ok">저장</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast"></div>
+<script src="/guardian.js"></script>
+</body>
+</html>
