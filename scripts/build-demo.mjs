@@ -42,6 +42,7 @@ let html = read("scripts/demo-shell.html")
   .replace("/*__BUNDLE__*/", () => inlineJs(bundle))
   .replace("/*__ICONS_JS__*/", () => inlineJs(read("public/icons.js")))
   .replace("/*__VOICE_JS__*/", () => inlineJs(read("public/voice-intents.js")))
+  .replace("/*__SCENES_JS__*/", () => inlineJs(read("public/scenes.js")))
   .replace("/*__GUARDIAN_JS__*/", () => inlineJs(read("public/guardian.js")))
   .replace("/*__PARENT_JS__*/", () => inlineJs(read("public/parent.js")))
   .replace("/*__SHELL_JS__*/", () => inlineJs(read("scripts/demo-shell.js")));

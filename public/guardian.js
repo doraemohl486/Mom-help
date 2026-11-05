@@ -43,6 +43,13 @@ function avatarHtml(p, i, cls = "") {
   return `<span class="avatar a${i % 3} ${cls}" title="${esc(p?.name ?? "")}">${face}</span>`;
 }
 
+/** 받침에 따라 은/는: 엄마는, 민준은 */
+function eunNeun(word) {
+  const c = word.charCodeAt(word.length - 1);
+  if (c < 0xac00 || c > 0xd7a3) return `${word}은(는)`;
+  return (c - 0xac00) % 28 ? `${word}은` : `${word}는`;
+}
+
 let state = null;
 let lastJson = "";
 const openIds = new Set(); // 펼친 일정
@@ -180,6 +187,19 @@ function render() {
   // 지금 (진행 중)
   const nowList = live.filter(isNow);
   $("#nowBox").innerHTML = nowList.map((s) => scheduleCard(s, byId[s.parent_id], true)).join("");
+
+  // 오늘 (보이는) 일정이 없는 부모님: 즐거운 하루 그림
+  // 부모님만 보는 개인 일정이 있어도 여기 나온다 ("집에 계세요"처럼 단정하지 않음)
+  const tKey = dayKey(nowDate());
+  const busyToday = new Set(live.filter((s) => dayKey(new Date(s.start_at)) === tKey && s.status !== "arrived").map((s) => s.parent_id));
+  const resting = parents.filter((p) => !busyToday.has(p.id));
+  $("#restBox").hidden = !resting.length || !window.SCENES;
+  $("#restBox").classList.toggle("two", resting.length >= 2); // 두 분 이상이면 나란히 작게
+  $("#restBox").innerHTML = window.SCENES ? resting.map((p) => {
+    const sc = window.SCENES.sceneSvg(`${p.id}-${tKey}`, p.avatar);
+    return `<div class="card rest-card">${sc.html}
+      <div class="rest-text"><b>${esc(eunNeun(p.name))} 오늘 즐거운 하루를 보내고 있어요</b>${resting.length >= 2 ? "" : `<span>${esc(sc.caption)}</span>`}</div></div>`;
+  }).join("") : "";
 
   // 확인 필요
   const drafts = state.drafts || [];

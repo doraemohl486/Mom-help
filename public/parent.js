@@ -129,8 +129,9 @@ const HOME_BOTTOM = `
   <button class="bigbtn ghost" id="addSched" type="button" data-voice="add">${ic("edit")}일정 알려주기</button>`;
 
 function shell(main, foot = true) {
-  const face = data.parent.avatar ? `<span class="hello-face" aria-hidden="true">${esc(data.parent.avatar)}</span>` : "";
-  frame({ sub: longDay.format(nowDate()), title: `${face}${esc(data.parent.name)}, 안녕하세요`, main, bottom: foot ? HOME_BOTTOM : "" });
+  // 아이콘은 날짜 줄에 (인사말이 한 줄에 들어가게)
+  const sub = `${data.parent.avatar ? `${data.parent.avatar} ` : ""}${longDay.format(nowDate())}`;
+  frame({ sub, title: `${esc(data.parent.name)}, 안녕하세요`, main, bottom: foot ? HOME_BOTTOM : "" });
   const b = document.getElementById("addSched");
   if (b) b.onclick = () => openInput();
   const c = document.getElementById("openCal");
@@ -162,8 +163,16 @@ const whenSay = (s) => `${dayWord(new Date(s.start_at))} ${time.format(new Date(
 function render() {
   const s = data.current;
   if (!s) {
-    sayText = "예정된 일정이 없어요. 약속이나 갈 곳이 생기면 일정 알려주기를 눌러 주세요.";
-    shell(`<div class="card status"><div class="big-ic ok">${ic("check")}</div><h2>예정된 일정이 없어요</h2>
+    // 일정 없는 날: 즐거운 하루 그림 (날마다 바뀜)
+    const today = seoulDay(nowDate());
+    const sc = window.SCENES ? window.SCENES.sceneSvg(`${data.parent.name}-${today}`, data.parent.avatar) : null;
+    sayText = `오늘은 일정이 없어요. ${sc ? `${sc.caption}이에요. ` : ""}즐거운 하루 보내세요. 갈 곳이 생기면 일정 알려주기를 눌러 주세요.`;
+    shell(sc
+      ? `<div class="card rest-card">${sc.html}
+          <div class="rest-text"><b>오늘은 일정이 없어요</b><span>${esc(sc.caption)}</span></div></div>
+        <div class="card status"><h2>즐거운 하루 보내세요 😊</h2>
+          <p>약속이나 갈 곳이 생기면<br>아래 '일정 알려주기'를 눌러 주세요.</p></div>`
+      : `<div class="card status"><div class="big-ic ok">${ic("check")}</div><h2>예정된 일정이 없어요</h2>
       <p>약속이나 갈 곳이 생기면<br>아래 '일정 알려주기'를 눌러 주세요.</p></div>`);
     return;
   }
