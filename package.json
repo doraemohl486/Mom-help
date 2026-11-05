@@ -1,8 +1,8 @@
 {
-  "name": "eombba-eodi-gaya",
+  "name": "eombba-eodi-ga",
   "version": "0.1.0",
   "private": true,
-  "description": "엄빠어디가야 — 부모님 일정 알림 + 교통수단 비교 + AI 비서 택시 전화 호출",
+  "description": "엄빠어디가 — 부모님 일정 알림 + 교통수단 비교 + AI 비서 택시 전화 호출",
   "type": "module",
   "engines": {
     "node": ">=22.18"

@@ -35,7 +35,7 @@ if (import.meta.main) {
   const services = buildServices();
   const app = createApp(services);
   app.listen(config.port, () => {
-    console.log(`엄빠어디가야 서버: http://localhost:${config.port}`);
+    console.log(`엄빠어디가 서버: http://localhost:${config.port}`);
     console.log(`  AI 비서: ${services.agent.name} · 전화: ${services.calls.provider.name}`);
   });
   // 30초마다 알림 확인

@@ -65,7 +65,7 @@ splash.className = "splash";
 splash.setAttribute("aria-hidden", "true");
 splash.innerHTML = `<div class="splash-in">
   <div class="splash-road"><span class="splash-car">${ic("taxi")}</span></div>
-  <div class="splash-logo">엄빠<b>어디가야</b></div>
+  <div class="splash-logo">엄빠<b>어디가</b></div>
   <div class="splash-tag">오늘 갈 곳, 같이 챙겨 드려요</div>
 </div>`;
 app.parentElement.insertBefore(splash, app);
