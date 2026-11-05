@@ -332,3 +332,24 @@ body.big, .big { font-size: 22px; }
 .pc-cell i { width: 10px; height: 10px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 1.5px var(--brand-ink); }
 .pc-cell.sel { background: var(--ink); color: var(--surface); }
 .pc-cell.sel i { box-shadow: none; }
+
+/* ---------------- 음성 (부모님) ---------------- */
+.p-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.p-mic { flex: none; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px; background: var(--ink); color: var(--surface); font-size: 20px; font-weight: 800; padding: 12px 20px 12px 16px; min-height: 60px; box-shadow: var(--shadow); }
+.p-mic svg { font-size: 28px; color: var(--brand); }
+.p-mic.in-modal { justify-self: center; }
+.voice-hint { display: flex; align-items: center; gap: 8px; font-size: 18px; color: var(--sub); margin: -4px 4px 0; }
+.voice-hint svg { font-size: 22px; color: var(--accent); }
+.voice-back { position: fixed; inset: 0; z-index: 50; background: rgba(15, 20, 36, .55); display: flex; align-items: flex-end; justify-content: center; padding: 14px; }
+.voice-card { width: 100%; max-width: 540px; padding: 24px 20px; display: grid; gap: 14px; justify-items: stretch; }
+.voice-orb { justify-self: center; width: 112px; height: 112px; border-radius: 50%; display: grid; place-items: center; font-size: 56px; background: var(--brand); color: var(--brand-ink); position: relative; }
+.voice-orb.on::before, .voice-orb.on::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; border: 4px solid var(--brand); animation: ring 1.4s ease-out infinite; }
+.voice-orb.on::after { animation-delay: .7s; }
+.voice-live { text-align: center; font-size: 22px; color: var(--sub); margin: 0; min-height: 1.4em; }
+.voice-ex { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.chip { border: 2px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 16px; font-size: 19px; font-weight: 700; color: var(--ink); }
+.chip:hover { border-color: var(--ink); }
+.voice-input { font-size: 24px; padding: 14px 16px; border-radius: 16px; }
+.heard { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 45; width: min(520px, calc(100vw - 28px)); background: var(--ink); color: var(--surface); border-radius: 18px; padding: 14px 18px; display: grid; gap: 4px; font-size: 18px; box-shadow: var(--shadow); }
+.heard b { color: var(--brand); }
+@media (prefers-reduced-motion: reduce) { .voice-orb.on::before, .voice-orb.on::after { animation: none; } }
