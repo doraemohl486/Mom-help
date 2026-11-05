@@ -28,6 +28,8 @@ export function dueStages(now: Date, start: Date, times: Record<Stage, Date>, se
   const skip: Stage[] = [];
   // 당일에 등록된 일정이면 '내일 ~ 가셔요' 전날 알림은 의미가 없으니 건너뛴다
   if (!sent.includes("evening") && seoulDateKey(now) === seoulDateKey(start)) skip.push("evening");
+  // 이미 교통수단을 골랐으면 '뭐 타고 가실래요?'는 묻지 않는다
+  if (!["scheduled", "asked"].includes(status) && !sent.includes("ask") && now >= times.ask) skip.push("ask");
   const due = order.filter((s) => !sent.includes(s) && !skip.includes(s) && now >= times[s]);
   if (due.length) {
     // 가장 최근 단계만 보낸다
@@ -49,6 +51,10 @@ export class TripFlow {
     this.calls = calls;
   }
 
+  private now() {
+    return this.calls.clock();
+  }
+
   private parentOf(s: Schedule): Parent {
     return this.db.getParent(s.parent_id)!;
   }
@@ -65,7 +71,7 @@ export class TripFlow {
   }
 
   /** 주기적으로 호출: 보낼 알림이 있으면 보낸다 */
-  async tick(now = new Date()) {
+  async tick(now = this.now()) {
     const from = new Date(now.getTime() - 3 * 3600_000).toISOString();
     const to = new Date(now.getTime() + 2 * 24 * 3600_000).toISOString();
     for (const s of this.db.listActiveSchedules(from, to)) {
@@ -77,13 +83,19 @@ export class TripFlow {
     }
   }
 
-  async tickOne(scheduleId: number, now = new Date()) {
+  async tickOne(scheduleId: number, now = this.now()) {
     let s = this.db.getSchedule(scheduleId)!;
     if (!s.departure_at) {
       await this.plan(s.id);
       s = this.db.getSchedule(s.id)!;
     }
-    if (!["scheduled", "asked"].includes(s.status)) return;
+    // 예약해 둔 택시 호출 시각이 되면 AI가 전화
+    if (s.status === "taxi_reserved" && s.taxi_call_at && now >= new Date(s.taxi_call_at)) {
+      this.db.addEvent(s.id, "taxi_due", "예약한 시간이 되어 택시를 불러요");
+      await this.calls.requestTaxi(s.id);
+      return;
+    }
+    if (!["scheduled", "asked", "chosen", "taxi_reserved"].includes(s.status)) return;
     const sent = JSON.parse(s.stages_sent) as Stage[];
     const times = stageTimes(new Date(s.start_at), new Date(s.departure_at!));
     const { send, skip } = dueStages(now, new Date(s.start_at), times, sent, s.status);
@@ -98,15 +110,17 @@ export class TripFlow {
     const start = new Date(s.start_at);
     const dep = new Date(s.departure_at!);
     const memo = s.memo ? ` (${s.memo})` : "";
+    const taxiNote = s.status === "taxi_reserved" && s.taxi_call_at
+      ? ` ${formatTime(new Date(s.taxi_call_at))}에 택시 불러 드릴게요.` : "";
     switch (stage) {
       case "evening":
         this.notifier.toParent(p, s, "evening",
-          `${p.name}, 내일 ${formatTime(start)} ${s.place_name} 가셔요.${memo} ${formatTime(dep)}쯤 나가시면 돼요.`);
+          `${p.name}, 내일 ${formatTime(start)} ${s.place_name} 가셔요.${memo} ${formatTime(dep)}쯤 나가시면 돼요.${taxiNote}`);
         this.notifier.toGuardian(p, s, "evening", `내일 ${formatTime(start)} ${p.name} ${s.title} (${s.place_name})`);
         this.db.addEvent(s.id, "evening", "전날 알림 보냄");
         break;
       case "prep":
-        this.notifier.toParent(p, s, "prep", `${p.name}, 이제 준비하실 시간이에요. ${formatTime(start)} ${s.place_name}${memo}`);
+        this.notifier.toParent(p, s, "prep", `${p.name}, 이제 준비하실 시간이에요. ${formatTime(start)} ${s.place_name}${memo}${taxiNote}`);
         this.db.addEvent(s.id, "prep", "준비 알림 보냄");
         break;
       case "ask": {
@@ -145,6 +159,7 @@ export class TripFlow {
     if (["calling", "dispatched", "arrived", "cancelled"].includes(s.status)) {
       throw new Error("이미 진행 중이거나 끝난 일정이에요.");
     }
+    if (mode !== "taxi" && s.status === "taxi_reserved") this.db.updateSchedule(scheduleId, { taxi_call_at: null });
     if (!s.route_options || !s.departure_at) {
       await this.plan(scheduleId);
       s = this.db.getSchedule(scheduleId)!;
@@ -155,7 +170,7 @@ export class TripFlow {
     this.db.addEvent(scheduleId, "chosen", `${iGa(who)} '${MODE_LABEL[mode]}' 선택`);
 
     if (mode === "taxi") {
-      await this.calls.requestTaxi(scheduleId);
+      await this.reserveOrCallTaxi(scheduleId, by);
     } else if (mode === "transit") {
       const cmp = JSON.parse(s.route_options!) as Comparison;
       const t = cmp.options.find((o) => o.mode === "transit")!;
@@ -167,6 +182,41 @@ export class TripFlow {
         `${iGa(p.name)} 태워 달라고 하세요! ${formatTime(new Date(s.start_at))} ${s.place_name}, ${formatTime(new Date(s.departure_at!))} 출발`);
       this.notifier.toParent(p, s, "family", "자녀에게 부탁했어요. 곧 연락 올 거예요.");
     }
+  }
+
+  /**
+   * 택시를 고르면: 출발까지 시간이 있으면 알맞은 시각에 부르도록 예약하고,
+   * 이미 그 시각이 지났으면 바로 부른다.
+   */
+  private async reserveOrCallTaxi(scheduleId: number, by: "parent" | "guardian") {
+    const s = this.db.getSchedule(scheduleId)!;
+    const p = this.parentOf(s);
+    const cmp = JSON.parse(s.route_options!) as Comparison;
+    const taxi = cmp.options.find((o) => o.mode === "taxi")!;
+    const departure = new Date(new Date(s.start_at).getTime() - (taxi.durationMin + timing.arriveEarlyMin) * MIN);
+    const callAt = new Date(departure.getTime() - timing.taxiLeadMin * MIN);
+    if (this.now().getTime() >= callAt.getTime() - MIN) {
+      this.db.updateSchedule(scheduleId, { taxi_call_at: null });
+      await this.calls.requestTaxi(scheduleId);
+      return;
+    }
+    this.db.updateSchedule(scheduleId, {
+      status: "taxi_reserved", taxi_call_at: callAt.toISOString(), departure_at: departure.toISOString(),
+    });
+    const when = `${seoulDateKey(callAt) === seoulDateKey(this.now()) ? "오늘" : formatDate(callAt)} ${formatTime(callAt)}`;
+    this.db.addEvent(scheduleId, "taxi_reserved", `택시 예약: ${when}에 AI 비서가 불러요`);
+    this.notifier.toParent(p, s, "taxi_reserved", `${when}에 택시 불러 드릴게요. ${formatTime(departure)}쯤 나가실 준비 해 주세요.`);
+    if (by === "parent") this.notifier.toGuardian(p, s, "taxi_reserved", `${p.name}: 택시로 가신대요. ${when}에 AI 비서가 불러요.`);
+  }
+
+  /** 예약을 기다리지 않고 지금 바로 택시 부르기 */
+  async callTaxiNow(scheduleId: number) {
+    const s = this.db.getSchedule(scheduleId);
+    if (!s) throw new Error("일정을 찾을 수 없어요.");
+    if (["calling", "dispatched", "arrived", "cancelled"].includes(s.status)) throw new Error("이미 진행 중이거나 끝난 일정이에요.");
+    this.db.updateSchedule(scheduleId, { status: "chosen", chosen_mode: "taxi", taxi_call_at: null });
+    this.db.addEvent(scheduleId, "taxi_now", "지금 바로 택시 부르기");
+    await this.calls.requestTaxi(scheduleId);
   }
 
   async arrived(scheduleId: number) {

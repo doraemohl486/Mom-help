@@ -34,6 +34,30 @@ export interface Schedule {
   route_options: string | null; // JSON (RouteOption[])
   departure_at: string | null; // ISO, 예상 출발 시각
   stages_sent: string; // JSON string[]
+  taxi_call_at: string | null; // ISO, 택시 예약 호출 시각
+  source: ScheduleSource;
+  created_at: string;
+}
+
+export type ScheduleSource = "guardian" | "parent" | "sms";
+
+/** 문자·부모님 입력에서 읽어낸, 아직 저장 전인 일정 */
+export interface Draft {
+  id: number;
+  parent_id: number;
+  source: ScheduleSource;
+  raw_text: string;
+  title: string;
+  kind: string;
+  place_name: string;
+  place_address: string;
+  place_lat: number | null;
+  place_lng: number | null;
+  start_at: string | null;
+  memo: string;
+  /** pending: 부모님 확인 대기 / review: 자녀 확인 필요 / accepted / dismissed */
+  status: "pending" | "review" | "accepted" | "dismissed";
+  schedule_id: number | null;
   created_at: string;
 }
 
@@ -42,6 +66,7 @@ export type ScheduleStatus =
   | "asked" // 교통수단 물어봄
   | "escalated" // 무응답 → 자녀에게 넘김
   | "chosen" // 교통수단 선택됨
+  | "taxi_reserved" // 택시 예약됨 (정해진 시각에 AI가 호출)
   | "calling" // AI 통화 중
   | "dispatched" // 배차 완료
   | "call_failed" // 호출 실패
@@ -112,6 +137,25 @@ CREATE TABLE IF NOT EXISTS schedules (
   route_options TEXT,
   departure_at TEXT,
   stages_sent TEXT NOT NULL DEFAULT '[]',
+  taxi_call_at TEXT,
+  source TEXT NOT NULL DEFAULT 'guardian',
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS drafts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  parent_id INTEGER NOT NULL REFERENCES parents(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  raw_text TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT '기타',
+  place_name TEXT NOT NULL DEFAULT '',
+  place_address TEXT NOT NULL DEFAULT '',
+  place_lat REAL,
+  place_lng REAL,
+  start_at TEXT,
+  memo TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  schedule_id INTEGER REFERENCES schedules(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS calls (
@@ -157,6 +201,15 @@ export function openDb(file: string) {
   const db = new DatabaseSync(file);
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec(SCHEMA);
+  // 예전 DB 파일에 새 칸 추가
+  for (const col of ["real_name TEXT NOT NULL DEFAULT ''@parents", "taxi_call_at TEXT@schedules", "source TEXT NOT NULL DEFAULT 'guardian'@schedules"]) {
+    const [def, table] = col.split("@");
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${def}`);
+    } catch {
+      // 이미 있음
+    }
+  }
   const now = () => new Date().toISOString();
 
   const one = <T>(sql: string, ...args: (string | number | null)[]) =>
@@ -198,12 +251,14 @@ export function openDb(file: string) {
 
     // ---------- schedules ----------
     createSchedule(
-      s: Pick<Schedule, "parent_id" | "title" | "kind" | "place_name" | "place_address" | "place_lat" | "place_lng" | "start_at" | "memo">,
+      s: Pick<Schedule, "parent_id" | "title" | "kind" | "place_name" | "place_address" | "place_lat" | "place_lng" | "start_at" | "memo">
+        & { source?: ScheduleSource },
     ): Schedule {
       const r = run(
-        `INSERT INTO schedules (parent_id, title, kind, place_name, place_address, place_lat, place_lng, start_at, memo, created_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?)`,
-        s.parent_id, s.title, s.kind, s.place_name, s.place_address, s.place_lat, s.place_lng, s.start_at, s.memo, now(),
+        `INSERT INTO schedules (parent_id, title, kind, place_name, place_address, place_lat, place_lng, start_at, memo, source, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        s.parent_id, s.title, s.kind, s.place_name, s.place_address, s.place_lat, s.place_lng, s.start_at, s.memo,
+        s.source ?? "guardian", now(),
       );
       return this.getSchedule(Number(r.lastInsertRowid))!;
     },
@@ -228,6 +283,35 @@ export function openDb(file: string) {
     },
     deleteSchedule(id: number) {
       run(`DELETE FROM schedules WHERE id=?`, id);
+    },
+
+    /** 같은 부모님의 앞뒤 windowMin분 안에 있는 일정 (취소·도착 제외) */
+    findNearbySchedules(parentId: number, startIso: string, windowMin: number, excludeId: number | null = null) {
+      const t = new Date(startIso).getTime();
+      const from = new Date(t - windowMin * 60_000).toISOString();
+      const to = new Date(t + windowMin * 60_000).toISOString();
+      return all<Schedule>(
+        `SELECT * FROM schedules WHERE parent_id=? AND start_at BETWEEN ? AND ? AND status != 'cancelled' AND id != ? ORDER BY start_at`,
+        parentId, from, to, excludeId ?? -1,
+      );
+    },
+
+    // ---------- drafts ----------
+    createDraft(d: Omit<Draft, "id" | "schedule_id" | "created_at">): Draft {
+      const r = run(
+        `INSERT INTO drafts (parent_id, source, raw_text, title, kind, place_name, place_address, place_lat, place_lng, start_at, memo, status, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        d.parent_id, d.source, d.raw_text, d.title, d.kind, d.place_name, d.place_address, d.place_lat, d.place_lng, d.start_at, d.memo, d.status, now(),
+      );
+      return this.getDraft(Number(r.lastInsertRowid))!;
+    },
+    getDraft: (id: number) => one<Draft>(`SELECT * FROM drafts WHERE id=?`, id),
+    listReviewDrafts: () => all<Draft>(`SELECT * FROM drafts WHERE status='review' ORDER BY id DESC`),
+    updateDraft(id: number, fields: Partial<Omit<Draft, "id">>) {
+      const keys = Object.keys(fields) as (keyof typeof fields)[];
+      if (!keys.length) return;
+      run(`UPDATE drafts SET ${keys.map((k) => `${k}=?`).join(", ")} WHERE id=?`,
+        ...keys.map((k) => (fields[k] ?? null) as string | number | null), id);
     },
 
     // ---------- calls ----------

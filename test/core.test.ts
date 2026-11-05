@@ -7,6 +7,7 @@ import { extractDispatch, RuleBasedCallAgent, type CallBrief } from "../src/call
 import { isTaxiCenterOpen } from "../src/call/service.ts";
 import { stepToTwiml, validTwilioSignature } from "../src/call/twilio.ts";
 import crypto from "node:crypto";
+import { parseDate, parseTime, RuleAppointmentParser } from "../src/parse.ts";
 
 test("한국 시간 변환", () => {
   const d = fromSeoulLocal("2026-11-12T10:00");
@@ -103,4 +104,25 @@ test("Twilio TwiML 생성과 서명 검증", () => {
   const sig = crypto.createHmac("sha1", "tok").update(url + "CallSidCA1SpeechResult네").digest("base64");
   assert.equal(validTwilioSignature("tok", url, params, sig), true);
   assert.equal(validTwilioSignature("tok", url, params, "bad"), false);
+});
+
+test("규칙 기반 날짜·시간 읽기", async () => {
+  const now = fromSeoulLocal("2026-11-05T09:00"); // 목요일
+  assert.equal(parseDate("내일 병원", now), "2026-11-06");
+  assert.equal(parseDate("11/12 진료", now), "2026-11-12");
+  assert.equal(parseDate("2027.01.03 검진", now), "2027-01-03");
+  assert.equal(parseDate("3월 2일", now), "2027-03-02"); // 지난 달이면 내년
+  assert.equal(parseDate("다음주 화요일", now), "2026-11-10");
+  assert.equal(parseDate("이번주 토요일", now), "2026-11-07");
+  assert.equal(parseDate("월요일에", now), "2026-11-09");
+  assert.equal(parseTime("오후 2시 30분"), "14:30");
+  assert.equal(parseTime("10:30"), "10:30");
+  assert.equal(parseTime("3시 반"), "15:30"); // 1~6시는 오후로
+  assert.equal(parseTime("아침 열 시"), "10:00");
+  const p = await new RuleAppointmentParser().parse("[서울대학교병원] 11/20(금) 09:10 내과 진료. 검사 전 금식", now);
+  assert.equal(p.is_appointment, true);
+  assert.equal(p.place_name, "서울대학교병원");
+  assert.equal(p.date, "2026-11-20");
+  assert.equal(p.time, "09:10");
+  assert.match(p.memo, /금식/);
 });

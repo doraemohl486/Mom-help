@@ -21,6 +21,9 @@ const SAMPLE: Place[] = [
   { name: "종로구 탑골공원", address: "서울 종로구 종로 99", lat: 37.5711, lng: 126.9882 },
 ];
 
+const norm = (s: string) =>
+  s.replace(/\s/g, "").replace(/대학교병원|대학병원|대병원/g, "대병원").replace(/세브란스$/, "세브란스병원");
+
 export async function searchPlaces(q: string): Promise<Place[]> {
   const query = q.trim();
   if (!query) return [];
@@ -38,5 +41,10 @@ export async function searchPlaces(q: string): Promise<Place[]> {
       }));
     }
   }
-  return SAMPLE.filter((p) => p.name.includes(query) || p.address.includes(query));
+  // "서울대병원" → "서울대학교병원"처럼 흔한 줄임말도 찾기
+  const key = norm(query);
+  return SAMPLE.filter((p) => {
+    const n = norm(p.name);
+    return n.includes(key) || key.includes(n) || norm(p.address).includes(key);
+  });
 }

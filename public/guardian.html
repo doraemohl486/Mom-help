@@ -19,6 +19,11 @@
     <button class="btn primary" onclick="openParentDialog()">부모님 등록</button>
   </div>
 
+  <div id="draftsBox" style="display:none">
+    <h2>확인이 필요한 일정</h2>
+    <div id="drafts"></div>
+  </div>
+
   <h2>일정</h2>
   <div id="schedules"></div>
 
@@ -28,6 +33,9 @@
   <h2>부모님</h2>
   <div id="parents"></div>
   <button class="btn" onclick="openParentDialog()">+ 부모님 추가</button>
+
+  <h2>병원 예약 문자 자동으로 가져오기</h2>
+  <div class="card" id="inboxBox"><span class="muted">부모님을 먼저 등록해 주세요.</span></div>
 
   <h2>개발·데모</h2>
   <div class="card">
@@ -81,6 +89,12 @@
     <h3 style="margin-top:0">일정 추가</h3>
     <label>누구?</label>
     <div class="seg" id="whoSeg"></div>
+    <details id="pasteBox" style="margin-top:12px">
+      <summary><b>📋 예약 문자 붙여넣기</b> <span class="muted">— 자동으로 채워 드려요</span></summary>
+      <textarea name="smsText" rows="4" placeholder="[OO병원] 김영희님 11/12(목) 10:30 정형외과 진료 예약..."></textarea>
+      <button type="button" class="btn small" id="parseBtn" style="margin-top:6px">자동으로 채우기</button>
+    </details>
+    <input type="hidden" name="draft_id" />
     <label>무슨 일정?</label>
     <input name="title" placeholder="예: 무릎 정기검진" required />
     <label>종류</label>
@@ -102,6 +116,16 @@
       <button class="btn primary" value="ok">저장</button>
     </div>
   </form>
+</dialog>
+
+<!-- 중복·겹치는 일정 -->
+<dialog id="conflictDlg">
+  <h3 style="margin-top:0" id="conflictTitle">이미 같은 일정이 있어요</h3>
+  <div id="conflictList"></div>
+  <div class="row" style="justify-content:flex-end; margin-top:16px">
+    <button class="btn" id="conflictCancel">저장 안 할게요</button>
+    <button class="btn primary" id="conflictForce">그래도 저장</button>
+  </div>
 </dialog>
 
 <div class="toast" id="toast"></div>

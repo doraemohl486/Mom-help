@@ -8,6 +8,8 @@ import { SimulatorProvider } from "./call/simulator.ts";
 import { TwilioProvider } from "./call/twilio.ts";
 import { TripFlow } from "./flow.ts";
 import { createApp } from "./app.ts";
+import { Intake } from "./intake.ts";
+import { createParser } from "./parse.ts";
 
 export function buildServices(dbPath = config.dbPath, provider = config.callProvider) {
   const db = openDb(dbPath);
@@ -25,7 +27,8 @@ export function buildServices(dbPath = config.dbPath, provider = config.callProv
     calls.provider = simulator;
   }
   const flow = new TripFlow(db, notifier, calls);
-  return { db, notifier, agent, calls, simulator, flow, extraRouters };
+  const intake = new Intake(db, flow, createParser(), notifier);
+  return { db, notifier, agent, calls, simulator, flow, intake, extraRouters };
 }
 
 if (import.meta.main) {
