@@ -5,6 +5,9 @@ export const config = {
   dbPath: ":memory:",
   anthropicApiKey: "",
   kakaoRestApiKey: "",
+  vworldApiKey: "",
+  nominatimUrl: "off", // 체험판 페이지는 바깥 주소로 요청할 수 없음
+  geocoderContact: "",
   odsayApiKey: "",
   callProvider: "simulator" as "simulator" | "twilio",
   twilio: { accountSid: "", authToken: "", fromNumber: "" },

@@ -1,4 +1,5 @@
 import { config } from "./config.ts";
+import { nominatimSearch, vworldGeocode } from "./geocode.ts";
 
 export interface Place {
   name: string;
@@ -65,8 +66,13 @@ async function kakao(path: string, query: string): Promise<KakaoDoc[] | null> {
   return ((await res.json()) as { documents: KakaoDoc[] }).documents;
 }
 
-/** 정확한 장소만 (카카오 장소·주소 검색 또는 샘플) */
-export async function searchExactPlaces(q: string): Promise<Place[]> {
+export interface SearchOptions {
+  /** 바깥 무료 서비스(오픈스트리트맵·브이월드)까지 찾기. 입력할 때마다가 아니라 '검색'을 눌렀을 때만 */
+  online?: boolean;
+}
+
+/** 정확한 장소만 (카카오 → 브이월드·오픈스트리트맵 → 샘플) */
+export async function searchExactPlaces(q: string, opts: SearchOptions = {}): Promise<Place[]> {
   const query = q.trim();
   if (!query) return [];
   if (config.kakaoRestApiKey) {
@@ -88,15 +94,24 @@ export async function searchExactPlaces(q: string): Promise<Place[]> {
   }
   // "서울대병원" → "서울대학교병원"처럼 흔한 줄임말도 찾기
   const key = norm(query);
-  return SAMPLE.filter((p) => {
+  const samples = SAMPLE.filter((p) => {
     const n = norm(p.name);
     return n.includes(key) || key.includes(n) || norm(p.address).includes(key);
   });
+  if (!opts.online) return samples;
+  const found: Place[] = [];
+  if (ADDRESS_LIKE.test(query)) {
+    const vw = await vworldGeocode(query);
+    if (vw) found.push(vw);
+  }
+  found.push(...(await nominatimSearch(query)));
+  const seen = new Set(found.map((p) => norm(p.name)));
+  return [...found, ...samples.filter((p) => !seen.has(norm(p.name)))];
 }
 
 /** 화면 검색용: 정확한 결과 + 맨 끝에 '입력한 주소 그대로 쓰기' */
-export async function searchPlaces(q: string): Promise<Place[]> {
-  const exact = await searchExactPlaces(q);
+export async function searchPlaces(q: string, opts: SearchOptions = {}): Promise<Place[]> {
+  const exact = await searchExactPlaces(q, opts);
   const approx = approxPlace(q);
   const dup = approx && exact.some((p) => norm(p.address) === norm(approx.address) || norm(p.name) === norm(approx.name));
   return approx && !dup ? [...exact, approx] : exact;

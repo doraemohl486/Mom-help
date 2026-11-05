@@ -23,6 +23,10 @@ export const config = {
   dbPath: env("DB_PATH", "data/app.db"),
   anthropicApiKey: env("ANTHROPIC_API_KEY"),
   kakaoRestApiKey: env("KAKAO_REST_API_KEY"),
+  // 무료 주소·장소 찾기
+  vworldApiKey: env("VWORLD_API_KEY"), // 브이월드 (국토교통부) 주소 → 좌표, 무료 키
+  nominatimUrl: env("NOMINATIM_URL", "https://nominatim.openstreetmap.org"), // 오픈스트리트맵, 키 없음. "off"면 안 씀
+  geocoderContact: env("GEOCODER_CONTACT"), // 오픈스트리트맵 이용 규칙: 앱을 알 수 있는 연락처 (이메일 또는 웹사이트)
   odsayApiKey: env("ODSAY_API_KEY"),
   callProvider: env("CALL_PROVIDER", "simulator") as "simulator" | "twilio",
   twilio: {

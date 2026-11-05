@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap" />
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -108,7 +109,10 @@
     <label for="phone">휴대폰 번호 (배차 문자를 받을 번호)</label>
     <input id="phone" name="phone" placeholder="010-1234-5678" inputmode="tel" required />
     <label for="homeQuery">집 주소 (택시 출발지)</label>
-    <input id="homeQuery" name="placeQuery" placeholder="예: 마포구 망원동 OO아파트" autocomplete="off" />
+    <div class="search-row">
+      <input id="homeQuery" name="placeQuery" placeholder="예: 마포구 망원동 OO아파트" autocomplete="off" enterkeyhint="search" />
+      <button type="button" class="btn dark" data-search>검색</button>
+    </div>
     <div class="results" id="homeResults" hidden></div>
     <input id="home_address" class="gap-top" name="home_address" placeholder="검색해서 골라 주세요" readonly required />
     <input type="hidden" name="home_lat" /><input type="hidden" name="home_lng" />
@@ -148,7 +152,10 @@
     <label for="start_local">언제?</label>
     <input id="start_local" type="datetime-local" name="start_local" required />
     <label for="placeQuery">어디?</label>
-    <input id="placeQuery" name="placeQuery" placeholder="병원·장소 이름 검색" autocomplete="off" />
+    <div class="search-row">
+      <input id="placeQuery" name="placeQuery" placeholder="병원·장소 이름 또는 주소" autocomplete="off" enterkeyhint="search" />
+      <button type="button" class="btn dark" data-search>검색</button>
+    </div>
     <div class="results" id="placeResults" hidden></div>
     <input id="place_name" class="gap-top" name="place_name" placeholder="검색해서 골라 주세요" readonly required />
     <input type="hidden" name="place_address" /><input type="hidden" name="place_lat" /><input type="hidden" name="place_lng" />
@@ -175,6 +182,7 @@
 </dialog>
 
 <div class="toast" id="toast" role="status"></div>
+<script src="/vendor/leaflet/leaflet.js"></script>
 <script src="/icons.js"></script>
 <script src="/guardian.js"></script>
 </body>

@@ -31,6 +31,8 @@ export function createApp({ extraRouters = [], ...deps }: AppDeps) {
   }
 
   app.use(express.static(publicDir));
+  // 지도 그리기 도구 (Leaflet, 무료) — CDN 대신 직접 제공
+  app.use("/vendor/leaflet", express.static(path.join(here, "..", "node_modules", "leaflet", "dist")));
   app.get("/p/:token", (_req, res) => res.sendFile(path.join(publicDir, "parent.html")));
   app.get("/", (_req, res) => res.sendFile(path.join(publicDir, "guardian.html")));
 

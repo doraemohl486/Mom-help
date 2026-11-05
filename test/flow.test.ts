@@ -5,7 +5,11 @@ import { buildServices } from "../src/server.ts";
 import { createApp } from "../src/app.ts";
 import { fromSeoulLocal } from "../src/time.ts";
 
-// 외부 API 키 없이 (추정치 + 규칙 기반 비서 + 시뮬레이터) 전체 흐름을 검증한다.
+import { config } from "../src/config.ts";
+
+// 외부 API 키 없이 (추정치 + 규칙 기반 비서 + 시뮬레이터) 전체 흐름을 검증한다. 바깥 지도 서비스도 끔
+config.nominatimUrl = "off";
+config.vworldApiKey = "";
 delete process.env.ANTHROPIC_API_KEY;
 delete process.env.ANTHROPIC_AUTH_TOKEN;
 

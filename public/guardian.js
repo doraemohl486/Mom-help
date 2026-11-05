@@ -423,6 +423,7 @@ function scheduleCard(s, p, hero) {
         ${s.memo ? `<span>${ic("edit")}<b>${esc(s.memo)}</b></span>` : ""}
         ${SOURCE[s.source] ? `<span>${ic(s.source === "sms" ? "sms" : "users")}${SOURCE[s.source]}</span>` : ""}
       </div>
+      ${mapBlock(s, p)}
       ${["dispatched", "arrived", "cancelled"].includes(s.status) ? "" : modesBlock(s)}
       ${s.events.length ? `<details class="more"><summary>진행 기록 ${s.events.length}개</summary><ul class="timeline">${s.events.map((e) => `<li><time>${fmtTime.format(new Date(e.created_at))}</time><span>${esc(e.message)}</span></li>`).join("")}</ul></details>` : ""}
       ${transcript}
@@ -444,6 +445,31 @@ function scheduleCard(s, p, hero) {
     </button>
     ${body}
   </div>`;
+}
+
+// ---------------------------------------------------------------- 지도 (오픈스트리트맵, 무료)
+const mapsOn = () => Boolean(window.L) && !window.demo;
+function mapBlock(s, p) {
+  if (!mapsOn() || !p) return "";
+  return `<div class="map" data-map="${p.home_lat},${p.home_lng},${s.place_lat},${s.place_lng}"
+    data-labels="${esc(p.name)} 집|${esc(s.place_name)}" role="img" aria-label="${esc(p.name)} 집에서 ${esc(s.place_name)}까지 지도"></div>`;
+}
+function initMaps() {
+  if (!mapsOn()) return;
+  for (const el of document.querySelectorAll(".map[data-map]:not(.ready)")) {
+    el.classList.add("ready");
+    const [a, b, c, d] = el.dataset.map.split(",").map(Number);
+    const [homeLabel, placeLabel] = el.dataset.labels.split("|");
+    const map = window.L.map(el, { zoomControl: false, scrollWheelZoom: false, dragging: !window.L.Browser.mobile });
+    window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+    const dot = (cls) => window.L.divIcon({ className: `pin ${cls}`, iconSize: [18, 18] });
+    window.L.marker([a, b], { icon: dot("home"), title: homeLabel }).addTo(map).bindTooltip(homeLabel);
+    window.L.marker([c, d], { icon: dot("dest"), title: placeLabel }).addTo(map).bindTooltip(placeLabel, { permanent: true, direction: "top" });
+    window.L.polyline([[a, b], [c, d]], { color: "#2b3a8f", weight: 3, dashArray: "6 6" }).addTo(map);
+    map.fitBounds([[a, b], [c, d]], { padding: [28, 28], maxZoom: 15 });
+  }
 }
 
 function draftCard(d, p) {
@@ -553,17 +579,27 @@ $("#gTabs").addEventListener("click", (e) => {
 // ---------------- 장소 검색 ----------------
 function bindPlaceSearch(form, resultsEl, onPick) {
   let timer;
-  form.placeQuery.addEventListener("input", () => {
-    clearTimeout(timer);
-    timer = setTimeout(async () => {
-      const q = form.placeQuery.value.trim();
-      if (!q) return (resultsEl.hidden = true);
-      const places = await api("GET", `/api/places?q=${encodeURIComponent(q)}`);
+  let seq = 0;
+  // 입력하는 동안: 빠른 추천(샘플·그대로 쓰기) / '검색'·Enter: 무료 지도 서비스까지 찾기
+  const run = async (online) => {
+    const q = form.placeQuery.value.trim();
+    if (!q) return (resultsEl.hidden = true);
+    const my = ++seq;
+    if (online) {
+      resultsEl.innerHTML = `<div class="muted">지도에서 찾는 중이에요…</div>`;
+      resultsEl.hidden = false;
+    }
+    {
+      const places = await api("GET", `/api/places?q=${encodeURIComponent(q)}${online ? "&full=1" : ""}`);
+      if (my !== seq) return;
       resultsEl.innerHTML = places.length
         ? places.map((p, i) => p.approx
           ? `<div data-i="${i}" class="approx">${ic("edit")}<span><b>"${esc(p.name)}" 그대로 쓰기</b><br><span class="muted">지도에서 못 찾았어요. 위치는 대략으로 잡아요</span></span></div>`
           : `<div data-i="${i}"><b>${esc(p.name)}</b><br><span class="muted">${esc(p.address)}</span></div>`).join("")
         : `<div class="muted">검색 결과가 없어요. 동 이름이나 도로명을 더 넣어 보세요</div>`;
+      if (!online && places.every((p) => p.approx)) {
+        resultsEl.insertAdjacentHTML("afterbegin", `<div class="muted hint">${ic("chevron")}'검색'을 누르면 지도에서 찾아봐요</div>`);
+      }
       resultsEl.hidden = false;
       resultsEl.onclick = (ev) => {
         const i = ev.target.closest("[data-i]")?.dataset.i;
@@ -572,7 +608,22 @@ function bindPlaceSearch(form, resultsEl, onPick) {
         resultsEl.hidden = true;
         form.querySelector(".form-error").hidden = true;
       };
-    }, 250);
+    }
+  };
+  form.placeQuery.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => run(false), 250);
+  });
+  form.placeQuery.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault(); // 저장(제출)이 아니라 검색
+      clearTimeout(timer);
+      run(true);
+    }
+  });
+  form.querySelector("[data-search]")?.addEventListener("click", () => {
+    clearTimeout(timer);
+    run(true);
   });
 }
 
@@ -742,6 +793,13 @@ $("#scenario").addEventListener("click", async (e) => {
   await api("POST", "/api/simulator/scenario", { scenario: b.dataset.v });
   refresh(true);
 });
+
+// 다시 그릴 때마다 새 지도 붙이기
+const renderBase = render;
+render = function renderWithMaps() {
+  renderBase();
+  initMaps();
+};
 
 paintIcons();
 // 시작 화면: 첫 데이터를 받고, 최소 0.9초는 보여 준 뒤 사라짐
