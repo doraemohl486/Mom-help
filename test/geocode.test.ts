@@ -75,3 +75,12 @@ test("화면 검색: 입력 중에는 바깥 서비스를 부르지 않고, '검
   config.nominatimUrl = "off";
   setGeocodeFetch(null);
 });
+
+test("체험판 AI 장소 답 검사: 한국 밖 좌표·이름 없는 것·형식 틀린 답은 버림", async () => {
+  const { parseAiPlaces } = await import("../src/demo/ai-places.ts");
+  const good = parseAiPlaces('네, 찾았어요.\n[{"name":"은평구청","address":"서울 은평구 은평로 195","lat":37.6027,"lng":126.9291},{"name":"","lat":37,"lng":127},{"name":"도쿄역","lat":35.68,"lng":139.76}]');
+  assert.deepEqual(good, [{ name: "은평구청", address: "서울 은평구 은평로 195", lat: 37.6027, lng: 126.9291, ai: true }]);
+  assert.deepEqual(parseAiPlaces("모르겠어요"), []);
+  assert.deepEqual(parseAiPlaces("[{oops"), []);
+  assert.equal(parseAiPlaces(JSON.stringify(Array.from({ length: 9 }, (_, i) => ({ name: `곳${i}`, lat: 37.5, lng: 127 })))).length, 5);
+});

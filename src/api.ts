@@ -187,7 +187,7 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
 
   r("GET", "/api/places", async (req) => {
     // full=1: '검색' 버튼을 눌렀을 때만 바깥 무료 서비스까지 찾음 (오픈스트리트맵 이용 규칙)
-    return reply(200, await searchPlaces(String(req.query.q ?? ""), { online: req.query.full === "1" }));
+    return reply(200, await searchPlaces(String(req.query.q ?? ""), { online: req.query.full === "1", interactive: true }));
   });
 
   r("POST", "/api/simulator/scenario", async (req) => {

@@ -586,7 +586,7 @@ function bindPlaceSearch(form, resultsEl, onPick) {
     if (!q) return (resultsEl.hidden = true);
     const my = ++seq;
     if (online) {
-      resultsEl.innerHTML = `<div class="muted">지도에서 찾는 중이에요…</div>`;
+      resultsEl.innerHTML = `<div class="muted">${window.demo ? "AI에게 물어보는 중이에요…" : "지도에서 찾는 중이에요…"}</div>`;
       resultsEl.hidden = false;
     }
     {
@@ -595,10 +595,10 @@ function bindPlaceSearch(form, resultsEl, onPick) {
       resultsEl.innerHTML = places.length
         ? places.map((p, i) => p.approx
           ? `<div data-i="${i}" class="approx">${ic("edit")}<span><b>"${esc(p.name)}" 그대로 쓰기</b><br><span class="muted">지도에서 못 찾았어요. 위치는 대략으로 잡아요</span></span></div>`
-          : `<div data-i="${i}"><b>${esc(p.name)}</b><br><span class="muted">${esc(p.address)}</span></div>`).join("")
+          : `<div data-i="${i}"><b>${esc(p.name)}</b>${p.ai ? ` <span class="pill accent">AI 추천</span>` : ""}<br><span class="muted">${esc(p.address)}${p.ai ? " · AI가 찾은 위치예요. 맞는지 확인해 주세요" : ""}</span></div>`).join("")
         : `<div class="muted">검색 결과가 없어요. 동 이름이나 도로명을 더 넣어 보세요</div>`;
       if (!online && places.every((p) => p.approx)) {
-        resultsEl.insertAdjacentHTML("afterbegin", `<div class="muted hint">${ic("chevron")}'검색'을 누르면 지도에서 찾아봐요</div>`);
+        resultsEl.insertAdjacentHTML("afterbegin", `<div class="muted hint">${ic("chevron")}'검색'을 누르면 ${window.demo ? "AI가" : "지도에서"} 찾아봐요</div>`);
       }
       resultsEl.hidden = false;
       resultsEl.onclick = (ev) => {

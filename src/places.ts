@@ -8,6 +8,15 @@ export interface Place {
   lng: number;
   /** 정확한 위치를 못 찾아 구·시 단위로 잡은 대략 위치 (입력한 주소 그대로 쓰기) */
   approx?: boolean;
+  /** AI가 알고 있는 정보로 찾은 위치 (체험판). 사람이 확인해야 함 */
+  ai?: boolean;
+}
+
+/** 화면에서 '검색'을 눌렀을 때 더해 볼 찾기 (체험판에서 'Claude에게 물어보기'를 끼워 넣음) */
+type ExtraProvider = (query: string) => Promise<Place[]>;
+let extraProvider: ExtraProvider | null = null;
+export function setExtraPlaceProvider(p: ExtraProvider | null) {
+  extraProvider = p;
 }
 
 // 카카오 API 키가 없을 때 데모용으로 쓰는 장소 목록 (좌표는 대략값)
@@ -69,6 +78,8 @@ async function kakao(path: string, query: string): Promise<KakaoDoc[] | null> {
 export interface SearchOptions {
   /** 바깥 무료 서비스(오픈스트리트맵·브이월드)까지 찾기. 입력할 때마다가 아니라 '검색'을 눌렀을 때만 */
   online?: boolean;
+  /** 사람이 화면에서 직접 찾는 중 (문자 자동 가져오기가 아님) */
+  interactive?: boolean;
 }
 
 /** 정확한 장소만 (카카오 → 브이월드·오픈스트리트맵 → 샘플) */
@@ -105,6 +116,9 @@ export async function searchExactPlaces(q: string, opts: SearchOptions = {}): Pr
     if (vw) found.push(vw);
   }
   found.push(...(await nominatimSearch(query)));
+  if (!found.length && opts.interactive && extraProvider) {
+    found.push(...(await extraProvider(query).catch(() => [])));
+  }
   const seen = new Set(found.map((p) => norm(p.name)));
   return [...found, ...samples.filter((p) => !seen.has(norm(p.name)))];
 }
