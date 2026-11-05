@@ -106,10 +106,11 @@ function micBtn() {
 }
 
 /** 위: 제목 + 🔊 + 🎤 / 가운데: 내용 / 아래: 버튼 줄 */
-function frame({ title, sub = "", main, bottom = "" }) {
+function frame({ title, sub = "", main, bottom = "", back = false }) {
   app.innerHTML = `<div class="p-app">
     <header class="app-top">
-      <div>${sub ? `<div class="p-date">${esc(sub)}</div>` : ""}<div class="p-hello">${title}</div></div>
+      ${back ? `<button class="round-btn" id="hdrBack" type="button" data-voice="back" aria-label="돌아가기">${ic("back")}</button>` : ""}
+      <div class="p-title">${sub ? `<div class="p-date">${esc(sub)}</div>` : ""}<div class="p-hello">${title}</div></div>
       <div class="p-tools">
         <button class="round-btn" id="say" type="button" data-voice="repeat" aria-label="소리로 듣기">${ic("speaker")}</button>
         ${micBtn()}
@@ -119,6 +120,8 @@ function frame({ title, sub = "", main, bottom = "" }) {
     ${bottom ? `<nav class="app-bottom p-bottom">${bottom}</nav>` : ""}
   </div>`;
   document.getElementById("say").onclick = () => speak(sayText || "말하기 버튼을 누르고 말씀해 주세요.");
+  const hb = document.getElementById("hdrBack");
+  if (hb) hb.onclick = backHome;
 }
 
 const HOME_BOTTOM = `
@@ -294,32 +297,32 @@ async function openCalendar(y, m) {
     if (w === 5 && row.every((c) => c.includes(" out "))) break;
     weeks.push(row.join(""));
   }
-  const selList = byDay.get(pcSel) || [];
-  const selDate = new Date(pMidnight(pcSel).getTime() + 12 * 3600000);
-  sayText = `${longDay.format(selDate)}. ${selList.length ? selList.map((s) => `${time.format(new Date(s.start_at))} ${s.place_name}`).join(", ") : "일정 없어요"}`;
+  /** 고른 날의 일정 (달력 바로 아래) */
+  const dayPanel = (k) => {
+    const list = byDay.get(k) || [];
+    const d = new Date(pMidnight(k).getTime() + 12 * 3600000);
+    sayText = `${longDay.format(d)}. ${list.length ? list.map((s) => `${time.format(new Date(s.start_at))} ${s.place_name}`).join(", ") : "일정 없어요"}`;
+    return `<h3>${esc(longDay.format(d))}</h3>` + (list.length
+      ? list.map((s) => `<div class="next-row"><span class="num">${esc(time.format(new Date(s.start_at)))}</span>
+          <span><b>${esc(s.place_name)}</b><small>${esc(s.title)}${s.memo ? ` · ${esc(s.memo)}` : ""}</small></span></div>`).join("")
+      : `<div class="next-row none">이날은 일정이 없어요</div>`);
+  };
+  const yearPrefix = pcY !== Number(today.slice(0, 4)) ? `${pcY}년 ` : "";
   frame({
-    sub: "달력",
-    title: `${pcY !== Number(today.slice(0, 4)) ? `${pcY}년 ` : ""}${pcM}월`,
+    back: true,
+    title: "달력",
     main: `
       <div class="card pc">
         <div class="pc-head">
-          <button type="button" class="round-btn" id="prevM" data-voice="prev" aria-label="이전 달">${ic("back")}</button>
-          <span class="p-hello">${pcM}월</span>
-          <button type="button" class="round-btn" id="nextM" data-voice="next" aria-label="다음 달">${ic("chevron")}</button>
+          <button type="button" class="round-btn sm" id="prevM" data-voice="prev" aria-label="이전 달">${ic("back")}</button>
+          <span class="pc-month">${yearPrefix}${pcM}월</span>
+          <button type="button" class="round-btn sm" id="nextM" data-voice="next" aria-label="다음 달">${ic("chevron")}</button>
         </div>
         <div class="pc-grid pc-wd">${["일", "월", "화", "수", "목", "금", "토"].map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
         <div class="pc-grid" id="pcGrid">${weeks.join("")}</div>
       </div>
-      <div class="card next-list">
-        <h3>${esc(longDay.format(selDate))}</h3>
-        ${selList.length ? selList.map((s) => `<div class="next-row"><span class="num">${esc(time.format(new Date(s.start_at)))}</span>
-            <span><b>${esc(s.place_name)}</b><small>${esc(s.title)}${s.memo ? ` · ${esc(s.memo)}` : ""}</small></span></div>`).join("")
-          : `<div class="next-row none">이날은 일정이 없어요</div>`}
-      </div>`,
-    bottom: `<button class="bigbtn" id="calBack" type="button" data-voice="back">${ic("back")}돌아가기</button>`,
+      <div class="card next-list" id="pcDay" aria-live="polite">${dayPanel(pcSel)}</div>`,
   });
-  app.querySelector(".p-bottom").classList.add("one");
-  document.getElementById("calBack").onclick = backHome;
   document.getElementById("prevM").onclick = () => openCalendar(pcM === 1 ? pcY - 1 : pcY, pcM === 1 ? 12 : pcM - 1);
   document.getElementById("nextM").onclick = () => openCalendar(pcM === 12 ? pcY + 1 : pcY, pcM === 12 ? 1 : pcM + 1);
   document.getElementById("pcGrid").onclick = (e) => {
@@ -327,7 +330,14 @@ async function openCalendar(y, m) {
     if (!cell) return;
     pcSel = cell.dataset.day;
     const [yy, mm] = pcSel.split("-").map(Number);
-    openCalendar(yy, mm).then(() => speak(sayText));
+    if (yy !== pcY || mm !== pcM) return openCalendar(yy, mm).then(() => speak(sayText));
+    // 같은 달: 다시 그리지 않고 고른 날 표시와 아래 일정만 바꿈 (화면이 움직이지 않게)
+    for (const c of app.querySelectorAll(".pc-cell.sel")) c.classList.remove("sel");
+    cell.classList.add("sel");
+    const panel = document.getElementById("pcDay");
+    panel.innerHTML = dayPanel(pcSel);
+    panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); // 아주 작은 화면이면 일정이 보이게
+    speak(sayText);
   };
 }
 

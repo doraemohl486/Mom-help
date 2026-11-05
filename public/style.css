@@ -410,3 +410,16 @@ details.more > summary { cursor: pointer; color: var(--sub); font-size: var(--t2
 .cal-handle { display: flex; align-items: center; justify-content: center; gap: var(--s1); width: 100%; min-height: var(--h-sm); margin-top: var(--s1); border: 0; border-top: 1px solid var(--line); background: none; color: var(--sub); font-size: var(--t2); font-weight: 700; }
 .cal-handle svg { font-size: var(--t4); }
 .cal-handle:hover { color: var(--ink); }
+
+/* 부모님 달력: 날짜와 그날 일정이 한 화면에 */
+.p-title { flex: 1; min-width: 0; }
+.round-btn.sm { width: 44px; height: 44px; font-size: var(--b2); }
+.pc-head { padding: 0 var(--s1) var(--s2); }
+.pc-month { font-family: var(--font-display); font-size: var(--b3); }
+.pc-cell { height: 46px; }
+.pc-cell.today span { width: 34px; height: 34px; }
+#pcDay .next-row { padding: var(--s2) 0; }
+.pc-cell { height: 42px; }
+.pc-wd span { padding-bottom: var(--s1); }
+.pc-head { padding-bottom: var(--s1); }
+#pcDay { padding-top: var(--s2); padding-bottom: var(--s2); }
