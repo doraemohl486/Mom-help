@@ -3,7 +3,7 @@ import type { Db, Draft, Schedule, ScheduleSource } from "./db.ts";
 import type { Notifier } from "./notify.ts";
 import type { TripFlow } from "./flow.ts";
 import type { AppointmentParser } from "./parse.ts";
-import { searchPlaces } from "./places.ts";
+import { searchExactPlaces } from "./places.ts";
 import { formatDate, formatTime, fromSeoulLocal, iGa } from "./time.ts";
 
 export interface Conflict {
@@ -88,7 +88,7 @@ export class Intake {
     if (!p.is_appointment) return null;
     let place = { name: p.place_name, address: "", lat: null as number | null, lng: null as number | null };
     if (p.place_name) {
-      const found = (await searchPlaces(p.place_name).catch(() => []))[0];
+      const found = (await searchExactPlaces(p.place_name).catch(() => []))[0];
       if (found) place = { name: found.name, address: found.address, lat: found.lat, lng: found.lng };
     }
     const startAt = p.date && p.time ? fromSeoulLocal(`${p.date}T${p.time}`).toISOString() : null;

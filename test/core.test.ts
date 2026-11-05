@@ -126,3 +126,22 @@ test("규칙 기반 날짜·시간 읽기", async () => {
   assert.equal(p.time, "09:10");
   assert.match(p.memo, /금식/);
 });
+
+test("검색에 안 나오는 주소도 '그대로 쓰기'로 고를 수 있다 (위치는 구·시 단위)", async () => {
+  const { approxPlace, searchPlaces, searchExactPlaces } = await import("../src/places.ts");
+  const eunpyeong = approxPlace("서울 은평구 진관동 은평뉴타운 아파트")!;
+  assert.equal(eunpyeong.approx, true);
+  assert.equal(eunpyeong.address, "서울 은평구 진관동 은평뉴타운 아파트");
+  assert.ok(Math.abs(eunpyeong.lat - 37.6027) < 0.01);
+  // '중구'가 '동대문구' 안에 걸리지 않게
+  assert.ok(Math.abs(approxPlace("동대문구 청량리동 1")!.lng - 127.04) < 0.01);
+  assert.ok(approxPlace("성남시 분당구 정자동")!.lat < 37.45);
+  // 구 이름이 없으면 서울 중심
+  assert.equal(approxPlace("망원동 123")!.lat, 37.5665);
+  assert.equal(approxPlace("택"), null);
+  assert.equal(approxPlace("세브란스"), null); // 주소처럼 보이지 않으면 만들지 않음
+  // 화면 검색: 정확한 결과 뒤에 '그대로 쓰기'가 붙고, 문자 읽기용 검색에는 없음
+  const ui = await searchPlaces("마포구 망원동 123");
+  assert.equal(ui[ui.length - 1].approx, true);
+  assert.ok((await searchExactPlaces("마포구 망원동 123")).every((p) => !p.approx));
+});

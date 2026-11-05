@@ -5,6 +5,8 @@ export interface Place {
   address: string;
   lat: number;
   lng: number;
+  /** 정확한 위치를 못 찾아 구·시 단위로 잡은 대략 위치 (입력한 주소 그대로 쓰기) */
+  approx?: boolean;
 }
 
 // 카카오 API 키가 없을 때 데모용으로 쓰는 장소 목록 (좌표는 대략값)
@@ -21,25 +23,68 @@ const SAMPLE: Place[] = [
   { name: "종로구 탑골공원", address: "서울 종로구 종로 99", lat: 37.5711, lng: 126.9882 },
 ];
 
+// 주소 글자로 대략 위치 잡기: 서울 25개 구 · 인천 · 경기 주요 시 (구청·시청 근처 좌표)
+const REGIONS: [string, number, number][] = [
+  ["강남구", 37.5172, 127.0473], ["강동구", 37.5301, 127.1238], ["강북구", 37.6396, 127.0257], ["강서구", 37.5509, 126.8495],
+  ["관악구", 37.4784, 126.9516], ["광진구", 37.5385, 127.0823], ["구로구", 37.4954, 126.8874], ["금천구", 37.4569, 126.8955],
+  ["노원구", 37.6542, 127.0568], ["도봉구", 37.6688, 127.0471], ["동대문구", 37.5744, 127.0400], ["동작구", 37.5124, 126.9393],
+  ["마포구", 37.5663, 126.9019], ["서대문구", 37.5791, 126.9368], ["서초구", 37.4837, 127.0324], ["성동구", 37.5633, 127.0371],
+  ["성북구", 37.5894, 127.0167], ["송파구", 37.5145, 127.1059], ["양천구", 37.5170, 126.8665], ["영등포구", 37.5264, 126.8962],
+  ["용산구", 37.5324, 126.9900], ["은평구", 37.6027, 126.9291], ["종로구", 37.5735, 126.9790], ["중랑구", 37.6063, 127.0925],
+  ["중구", 37.5641, 126.9979],
+  ["인천", 37.4563, 126.7052], ["고양", 37.6584, 126.8320], ["성남", 37.4200, 127.1267], ["수원", 37.2636, 127.0286],
+  ["용인", 37.2411, 127.1776], ["부천", 37.5034, 126.7660], ["안양", 37.3943, 126.9568], ["남양주", 37.6360, 127.2165],
+  ["화성", 37.1995, 126.8312], ["의정부", 37.7381, 127.0337], ["하남", 37.5393, 127.2148], ["광명", 37.4786, 126.8646],
+  ["과천", 37.4292, 126.9876], ["구리", 37.5943, 127.1296], ["김포", 37.6152, 126.7156], ["파주", 37.7599, 126.7802],
+  ["시흥", 37.3800, 126.8029], ["안산", 37.3219, 126.8309], ["군포", 37.3617, 126.9352], ["의왕", 37.3447, 126.9683],
+];
+const SEOUL_CENTER: [number, number] = [37.5665, 126.9780];
+const ADDRESS_LIKE = /(시|구|군|동|읍|면|리|로|길|번지|아파트|빌라|맨션|타워|마을|단지|\d)/;
+
+/** 검색에 안 나오는 주소도 그대로 쓸 수 있게: 주소 속 구·시 이름으로 대략 위치를 잡는다 */
+export function approxPlace(q: string): Place | null {
+  const query = q.trim();
+  if (query.length < 2 || !ADDRESS_LIKE.test(query)) return null;
+  // "중구"는 "동대문구"·"강동구"보다 나중에 봐야 하므로 긴 이름부터
+  const hit = [...REGIONS].sort((a, b) => b[0].length - a[0].length).find(([n]) => query.includes(n));
+  const [lat, lng] = hit ? [hit[1], hit[2]] : SEOUL_CENTER;
+  return { name: query, address: query, lat, lng, approx: true };
+}
+
 const norm = (s: string) =>
   s.replace(/\s/g, "").replace(/대학교병원|대학병원|대병원/g, "대병원").replace(/세브란스$/, "세브란스병원");
 
-export async function searchPlaces(q: string): Promise<Place[]> {
+type KakaoDoc = { place_name?: string; address_name: string; road_address_name?: string; road_address?: { address_name: string } | null; x: string; y: string };
+
+async function kakao(path: string, query: string): Promise<KakaoDoc[] | null> {
+  const url = new URL(`https://dapi.kakao.com/v2/local/search/${path}`);
+  url.searchParams.set("query", query);
+  url.searchParams.set("size", "8");
+  const res = await fetch(url, { headers: { Authorization: `KakaoAK ${config.kakaoRestApiKey}` } }).catch(() => null);
+  if (!res || !res.ok) return null;
+  return ((await res.json()) as { documents: KakaoDoc[] }).documents;
+}
+
+/** 정확한 장소만 (카카오 장소·주소 검색 또는 샘플) */
+export async function searchExactPlaces(q: string): Promise<Place[]> {
   const query = q.trim();
   if (!query) return [];
   if (config.kakaoRestApiKey) {
-    const url = new URL("https://dapi.kakao.com/v2/local/search/keyword.json");
-    url.searchParams.set("query", query);
-    url.searchParams.set("size", "8");
-    const res = await fetch(url, { headers: { Authorization: `KakaoAK ${config.kakaoRestApiKey}` } });
-    if (res.ok) {
-      const body = (await res.json()) as {
-        documents: { place_name: string; road_address_name: string; address_name: string; x: string; y: string }[];
-      };
-      return body.documents.map((d) => ({
-        name: d.place_name, address: d.road_address_name || d.address_name, lat: Number(d.y), lng: Number(d.x),
+    const places = await kakao("keyword.json", query);
+    if (places?.length) {
+      return places.map((d) => ({
+        name: d.place_name ?? d.address_name, address: d.road_address_name || d.address_name, lat: Number(d.y), lng: Number(d.x),
       }));
     }
+    // 장소 이름으로 안 나오면 도로명·지번 주소로
+    const addrs = await kakao("address.json", query);
+    if (addrs?.length) {
+      return addrs.map((d) => ({
+        name: d.road_address?.address_name || d.address_name, address: d.road_address?.address_name || d.address_name,
+        lat: Number(d.y), lng: Number(d.x),
+      }));
+    }
+    if (places || addrs) return [];
   }
   // "서울대병원" → "서울대학교병원"처럼 흔한 줄임말도 찾기
   const key = norm(query);
@@ -47,4 +92,12 @@ export async function searchPlaces(q: string): Promise<Place[]> {
     const n = norm(p.name);
     return n.includes(key) || key.includes(n) || norm(p.address).includes(key);
   });
+}
+
+/** 화면 검색용: 정확한 결과 + 맨 끝에 '입력한 주소 그대로 쓰기' */
+export async function searchPlaces(q: string): Promise<Place[]> {
+  const exact = await searchExactPlaces(q);
+  const approx = approxPlace(q);
+  const dup = approx && exact.some((p) => norm(p.address) === norm(approx.address) || norm(p.name) === norm(approx.name));
+  return approx && !dup ? [...exact, approx] : exact;
 }

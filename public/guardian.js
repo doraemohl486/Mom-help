@@ -560,14 +560,17 @@ function bindPlaceSearch(form, resultsEl, onPick) {
       if (!q) return (resultsEl.hidden = true);
       const places = await api("GET", `/api/places?q=${encodeURIComponent(q)}`);
       resultsEl.innerHTML = places.length
-        ? places.map((p, i) => `<div data-i="${i}"><b>${esc(p.name)}</b><br><span class="muted">${esc(p.address)}</span></div>`).join("")
-        : `<div class="muted">검색 결과가 없어요</div>`;
+        ? places.map((p, i) => p.approx
+          ? `<div data-i="${i}" class="approx">${ic("edit")}<span><b>"${esc(p.name)}" 그대로 쓰기</b><br><span class="muted">지도에서 못 찾았어요. 위치는 대략으로 잡아요</span></span></div>`
+          : `<div data-i="${i}"><b>${esc(p.name)}</b><br><span class="muted">${esc(p.address)}</span></div>`).join("")
+        : `<div class="muted">검색 결과가 없어요. 동 이름이나 도로명을 더 넣어 보세요</div>`;
       resultsEl.hidden = false;
       resultsEl.onclick = (ev) => {
         const i = ev.target.closest("[data-i]")?.dataset.i;
         if (i === undefined) return;
         onPick(places[Number(i)]);
         resultsEl.hidden = true;
+        form.querySelector(".form-error").hidden = true;
       };
     }, 250);
   });
@@ -587,12 +590,21 @@ const parentDlg = $("#parentDlg");
 const parentForm = $("#parentForm");
 segment($("#pNameSeg"), parentForm.pname);
 bindPlaceSearch(parentForm, $("#homeResults"), (p) => {
-  parentForm.home_address.value = `${p.address} (${p.name})`;
+  parentForm.home_address.value = p.approx || p.name === p.address ? p.address : `${p.address} (${p.name})`;
   parentForm.home_lat.value = p.lat;
   parentForm.home_lng.value = p.lng;
 });
+/** 입력창 안에 안내 보여 주기 (창 뒤에 가리는 토스트 대신) */
+function formError(form, msg) {
+  const el = form.querySelector(".form-error");
+  el.textContent = msg;
+  el.hidden = !msg;
+  if (msg) el.scrollIntoView({ block: "nearest" });
+}
+
 function openParentDialog() {
   parentForm.reset();
+  formError(parentForm, "");
   $("#homeResults").hidden = true;
   parentDlg.showModal();
 }
@@ -602,7 +614,14 @@ parentForm.addEventListener("submit", async (e) => {
   if (e.submitter?.value !== "ok") return;
   e.preventDefault();
   const f = parentForm;
-  if (!f.home_lat.value) return toast("집 주소를 검색해서 골라 주세요");
+  if (!f.pname.value.trim()) return formError(f, "호칭을 골라 주세요 (엄마·아빠)");
+  if (!f.real_name.value.trim()) return formError(f, "성함을 적어 주세요. 택시 부를 때 콜센터에 알려 드려요");
+  if (!/^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(f.phone.value.trim())) return formError(f, "휴대폰 번호를 확인해 주세요 (예: 010-1234-5678)");
+  if (!f.home_lat.value) {
+    return formError(f, f.placeQuery.value.trim()
+      ? "주소 검색 결과에서 하나를 눌러 골라 주세요"
+      : "집 주소를 검색해 주세요 (예: 마포구 망원동 OO아파트)");
+  }
   try {
     await api("POST", "/api/parents", {
       name: f.pname.value.trim(), real_name: f.real_name.value.trim(), phone: f.phone.value.trim(), home_address: f.home_address.value,
@@ -612,7 +631,7 @@ parentForm.addEventListener("submit", async (e) => {
     parentDlg.close();
     toast("등록했어요");
     refresh(true);
-  } catch (err) { toast(err.message); }
+  } catch (err) { formError(f, err.message); }
 });
 
 // ---------------- 일정 추가 ----------------
@@ -654,24 +673,27 @@ function fillFromDraft(d) {
   schedKind = d.kind || "기타";
   for (const b of $("#kindSeg").children) b.classList.toggle("on", b.dataset.v === schedKind);
   const missing = d.missing.filter((m) => m !== "장소 위치");
-  toast(missing.length ? `${missing.join(", ")}을(를) 채워 주세요` : "채웠어요. 확인하고 저장해 주세요");
+  if (d.place_lat === null && d.place_name) missing.push("장소(검색 결과에서 고르기)");
+  formError(schedForm, missing.length ? `${missing.join(", ")}을(를) 채워 주세요` : "");
+  if (!missing.length) toast("채웠어요. 확인하고 저장해 주세요");
 }
 
 $("#parseBtn").onclick = async () => {
   const text = schedForm.smsText.value.trim();
-  if (!text) return toast("문자를 붙여 넣어 주세요");
+  if (!text) return formError(schedForm, "문자를 붙여 넣어 주세요");
   $("#parseBtn").disabled = true;
   try {
     const d = await api("POST", "/api/parse", { parent_id: schedWho, text });
     fillFromDraft(d);
     $("#pasteBox").open = false;
-  } catch (e) { toast(e.message); }
+  } catch (e) { formError(schedForm, e.message); }
   $("#parseBtn").disabled = false;
 };
 
 function openScheduleDialog(parentId, dateKey) {
   if (!state?.parents.length) return openParentDialog();
   schedForm.reset();
+  formError(schedForm, "");
   schedForm.draft_id.value = "";
   $("#placeResults").hidden = true;
   $("#pasteBox").open = false;
@@ -693,7 +715,10 @@ schedForm.addEventListener("submit", async (e) => {
   if (e.submitter?.value !== "ok") return;
   e.preventDefault();
   const f = schedForm;
-  if (!f.place_lat.value) return toast("장소를 검색해서 골라 주세요");
+  if (!f.start_local.value) return formError(f, "언제인지 골라 주세요");
+  if (!f.place_lat.value) {
+    return formError(f, f.placeQuery.value.trim() ? "장소 검색 결과에서 하나를 눌러 골라 주세요" : "어디인지 검색해 주세요");
+  }
   const body = {
     parent_id: schedWho, title: f.title.value.trim(), kind: schedKind, start_local: f.start_local.value,
     place_name: f.place_name.value, place_address: f.place_address.value,
@@ -707,7 +732,7 @@ schedForm.addEventListener("submit", async (e) => {
     toast("일정을 저장했어요");
     showView("home");
     refresh(true);
-  } catch (err) { toast(err.message); }
+  } catch (err) { formError(f, err.message); }
 });
 
 // ---------------- 시뮬레이터 ----------------

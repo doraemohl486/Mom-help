@@ -108,7 +108,7 @@
     <label for="phone">휴대폰 번호 (배차 문자를 받을 번호)</label>
     <input id="phone" name="phone" placeholder="010-1234-5678" inputmode="tel" required />
     <label for="homeQuery">집 주소 (택시 출발지)</label>
-    <input id="homeQuery" name="placeQuery" placeholder="주소나 아파트 이름 검색" autocomplete="off" />
+    <input id="homeQuery" name="placeQuery" placeholder="예: 마포구 망원동 OO아파트" autocomplete="off" />
     <div class="results" id="homeResults" hidden></div>
     <input id="home_address" class="gap-top" name="home_address" placeholder="검색해서 골라 주세요" readonly required />
     <input type="hidden" name="home_lat" /><input type="hidden" name="home_lng" />
@@ -118,6 +118,7 @@
     </select>
     <label for="notes">콜센터에 전할 참고사항</label>
     <input id="notes" name="notes" placeholder="예: 지팡이를 쓰세요. 아파트 정문에서 기다리세요." />
+    <p class="form-error" role="alert" hidden></p>
     <div class="sheet-actions">
       <button class="btn" value="cancel" formnovalidate>취소</button>
       <button class="btn primary" id="parentSave" value="ok">저장</button>
@@ -153,6 +154,7 @@
     <input type="hidden" name="place_address" /><input type="hidden" name="place_lat" /><input type="hidden" name="place_lng" />
     <label for="memo">메모 (알림에 같이 보내요)</label>
     <input id="memo" name="memo" placeholder="예: 공복으로 가셔야 해요" />
+    <p class="form-error" role="alert" hidden></p>
     <div class="sheet-actions">
       <button class="btn" value="cancel" formnovalidate>취소</button>
       <button class="btn primary" value="ok">저장</button>

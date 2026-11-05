@@ -423,3 +423,8 @@ details.more > summary { cursor: pointer; color: var(--sub); font-size: var(--t2
 .pc-wd span { padding-bottom: var(--s1); }
 .pc-head { padding-bottom: var(--s1); }
 #pcDay { padding-top: var(--s2); padding-bottom: var(--s2); }
+
+/* 입력창 안 안내 · 대략 주소 */
+.form-error { margin-top: var(--s4); background: var(--bad-soft); color: var(--bad); border-radius: var(--r1); padding: var(--s3); font-size: var(--t2); font-weight: 700; }
+.results .approx { display: flex; gap: var(--s2); align-items: flex-start; background: var(--brand-soft); }
+.results .approx svg { font-size: var(--t4); margin-top: 2px; }
