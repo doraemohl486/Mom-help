@@ -238,3 +238,34 @@ test("API: 부모님이 말로 알려 준 일정 → 확인 → 저장, 중복�
     server.close();
   }
 });
+
+test("API: 달력은 기간 안의 일정을 지난 것까지 보여 주고, 부모님 링크는 자기 일정만", async () => {
+  const { svc, parent, sched } = setup();
+  const other = svc.db.createParent({
+    name: "아빠", phone: "010-9999-0000", home_address: "서울역", home_lat: 37.55, home_lng: 126.97, preferred_mode: null, notes: "",
+  });
+  const mk = (pid: number, local: string) => svc.db.createSchedule({
+    parent_id: pid, title: "x", kind: "기타", place_name: "서울역", place_address: "서울", place_lat: 37.55, place_lng: 126.97,
+    start_at: fromSeoulLocal(local).toISOString(), memo: "",
+  });
+  mk(other.id, "2026-11-03T09:00"); // 지난 일정
+  const cancelled = mk(parent.id, "2026-11-20T09:00");
+  svc.db.updateSchedule(cancelled.id, { status: "cancelled" });
+  mk(parent.id, "2026-12-02T09:00"); // 기간 밖
+  const app = createApp(svc);
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const range = `from=${encodeURIComponent(fromSeoulLocal("2026-11-01T00:00").toISOString())}&to=${encodeURIComponent(fromSeoulLocal("2026-12-01T00:00").toISOString())}`;
+  try {
+    const all = await (await fetch(`${base}/api/calendar?${range}`)).json();
+    assert.deepEqual(all.map((s: { parent_id: number }) => s.parent_id).sort(), [parent.id, other.id].sort());
+    assert.ok(all.some((s: { id: number }) => s.id === sched.id));
+    const mine = await (await fetch(`${base}/api/p/${parent.token}/calendar?${range}`)).json();
+    assert.deepEqual(mine.map((s: { id: number }) => s.id), [sched.id]);
+    assert.equal((await fetch(`${base}/api/calendar?from=x&to=y`)).status, 400);
+    const tooLong = `from=${encodeURIComponent(fromSeoulLocal("2026-01-01T00:00").toISOString())}&to=${encodeURIComponent(fromSeoulLocal("2026-12-01T00:00").toISOString())}`;
+    assert.equal((await fetch(`${base}/api/calendar?${tooLong}`)).status, 400);
+  } finally {
+    server.close();
+  }
+});

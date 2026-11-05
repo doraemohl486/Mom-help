@@ -19,7 +19,7 @@ const MODE = {
 let data = null;
 let lastKey = "";
 let busy = false;
-let mode = "home"; // home | input — 입력 중에는 자동 새로고침으로 화면을 바꾸지 않음
+let mode = "home"; // home | input | calendar — home이 아닐 때는 자동 새로고침으로 화면을 바꾸지 않음
 
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
@@ -84,10 +84,14 @@ function shell(main, foot = true) {
       <div class="p-hello">${esc(data.parent.name)}, 안녕하세요</div>
     </header>
     <main class="p-main">${main}</main>
-    ${foot ? `<footer class="p-foot"><button class="bigbtn ghost" id="addSched" type="button">${ic("edit")}일정 알려주기</button></footer>` : ""}
+    ${foot ? `<footer class="p-foot stack">
+      <button class="bigbtn ghost" id="openCal" type="button">${ic("cal")}달력 보기</button>
+      <button class="bigbtn ghost" id="addSched" type="button">${ic("edit")}일정 알려주기</button></footer>` : ""}
   </div>`;
   const b = document.getElementById("addSched");
   if (b) b.onclick = openInput;
+  const c = document.getElementById("openCal");
+  if (c) c.onclick = () => openCalendar();
 }
 
 function apptCard(s) {
@@ -198,6 +202,92 @@ function render() {
   document.getElementById("say").onclick = () => {
     if (!cmp) return;
     speak(`${dayWord(new Date(s.start_at))} ${time.format(new Date(s.start_at))}에 ${s.place_name} 가셔야 해요. 뭐 타고 가실래요? ${cmp.reason} 추천은 ${MODE[cmp.recommended].t}예요.`);
+  };
+}
+
+// ---------------- 달력 (큰 글씨) ----------------
+let pcY = 0;
+let pcM = 0;
+let pcSel = "";
+const pKey = (y, m, d) => `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+const pMidnight = (key) => {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, -9));
+};
+
+async function openCalendar(y, m) {
+  mode = "calendar";
+  const today = seoulDay(nowDate());
+  if (!y) {
+    pcY = Number(today.slice(0, 4));
+    pcM = Number(today.slice(5, 7));
+    pcSel = today;
+  } else {
+    pcY = y;
+    pcM = m;
+  }
+  const first = pMidnight(pKey(pcY, pcM, 1));
+  const firstWd = new Date(first.getTime() + 9 * 3600000).getUTCDay();
+  const start = new Date(first.getTime() - firstWd * 86400000);
+  const end = new Date(start.getTime() + 42 * 86400000);
+  const res = await fetch(`/api/p/${tok()}/calendar?from=${encodeURIComponent(start.toISOString())}&to=${encodeURIComponent(end.toISOString())}`);
+  const list = res.ok ? await res.json() : [];
+  const byDay = new Map();
+  for (const s of list) {
+    const k = seoulDay(new Date(s.start_at));
+    if (!byDay.has(k)) byDay.set(k, []);
+    byDay.get(k).push(s);
+  }
+  const weeks = [];
+  for (let w = 0; w < 6; w++) {
+    const row = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start.getTime() + (w * 7 + i) * 86400000);
+      const k = seoulDay(d);
+      const [, mm, dd] = k.split("-").map(Number);
+      const has = (byDay.get(k) || []).length;
+      row.push(`<button type="button" class="pc-cell ${mm !== pcM ? "out" : ""} ${k === today ? "today" : ""} ${k === pcSel ? "sel" : ""} ${i === 0 ? "sun" : i === 6 ? "sat" : ""}" data-day="${k}"
+        aria-label="${mm}월 ${dd}일${has ? ` 일정 ${has}개` : ""}"><span>${dd}</span>${has ? `<i></i>` : ""}</button>`);
+    }
+    // 마지막 줄이 모두 다음 달이면 생략
+    if (w === 5 && row.every((c) => c.includes(" out "))) break;
+    weeks.push(row.join(""));
+  }
+  const selList = byDay.get(pcSel) || [];
+  const selDate = new Date(pMidnight(pcSel).getTime() + 12 * 3600000);
+  app.innerHTML = `<div class="p-app">
+    <header class="p-top"><div class="p-date">달력</div>
+      <div class="pc-head">
+        <button type="button" class="pc-nav" id="prevM" aria-label="이전 달">${ic("chevron").replace("<svg", '<svg style="transform:scaleX(-1)"')}</button>
+        <div class="p-hello">${pcY !== Number(today.slice(0, 4)) ? `${pcY}년 ` : ""}${pcM}월</div>
+        <button type="button" class="pc-nav" id="nextM" aria-label="다음 달">${ic("chevron")}</button>
+      </div>
+    </header>
+    <main class="p-main">
+      <div class="card pc">
+        <div class="pc-grid pc-wd">${["일", "월", "화", "수", "목", "금", "토"].map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
+        <div class="pc-grid" id="pcGrid">${weeks.join("")}</div>
+      </div>
+      <div class="card next-list">
+        <h3>${esc(longDay.format(selDate))}</h3>
+        ${selList.length ? selList.map((s) => `<div class="next-row"><span class="num">${esc(time.format(new Date(s.start_at)))}</span>
+            <span><b>${esc(s.place_name)}</b><br><span style="font-size:18px;color:var(--sub)">${esc(s.title)}${s.memo ? ` · ${esc(s.memo)}` : ""}</span></span></div>`).join("")
+          : `<div class="next-row" style="grid-template-columns:1fr;color:var(--sub)">이날은 일정이 없어요</div>`}
+      </div>
+      <button class="bigbtn" id="calBack" type="button">돌아가기</button>
+    </main>
+  </div>`;
+  document.getElementById("calBack").onclick = backHome;
+  document.getElementById("prevM").onclick = () => openCalendar(pcM === 1 ? pcY - 1 : pcY, pcM === 1 ? 12 : pcM - 1);
+  document.getElementById("nextM").onclick = () => openCalendar(pcM === 12 ? pcY + 1 : pcY, pcM === 12 ? 1 : pcM + 1);
+  document.getElementById("pcGrid").onclick = (e) => {
+    const cell = e.target.closest("[data-day]");
+    if (!cell) return;
+    pcSel = cell.dataset.day;
+    const [yy, mm] = pcSel.split("-").map(Number);
+    openCalendar(yy, mm);
+    const n = (byDay.get(pcSel) || []).length;
+    speak(`${longDay.format(new Date(pMidnight(pcSel).getTime() + 12 * 3600000))}. ${n ? `일정 ${n}개` : "일정 없어요"}`);
   };
 }
 

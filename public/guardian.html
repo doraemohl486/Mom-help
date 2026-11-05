@@ -30,8 +30,17 @@
         <h2 class="sec">확인이 필요해요 <span class="count" id="draftCount"></span></h2>
         <div id="drafts" class="stack"></div>
       </div>
-      <h2 class="sec" id="upcomingTitle">다가오는 일정</h2>
-      <div id="schedules" class="stack"></div>
+      <div class="row between cal-bar">
+        <h2 class="sec" style="margin:0">전체 일정</h2>
+        <div class="seg seg-sm" id="homeMode" role="tablist">
+          <button type="button" data-v="cal" class="on">달력</button><button type="button" data-v="list">목록</button>
+        </div>
+      </div>
+      <div id="calWrap" class="stack">
+        <div class="card cal" id="calBox"></div>
+        <div id="dayBox" class="stack"></div>
+      </div>
+      <div id="schedules" class="stack" hidden></div>
     </section>
 
     <!-- 알림 -->

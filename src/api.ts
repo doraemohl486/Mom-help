@@ -70,6 +70,11 @@ const DraftEditZ = z.object({
   memo: z.string().max(200),
 }).partial();
 const TextZ = z.object({ text: z.string().min(1).max(2000) });
+// 달력 기간 (최대 6주)
+const RangeZ = z.object({ from: z.iso.datetime(), to: z.iso.datetime() }).refine(
+  (r) => new Date(r.to).getTime() - new Date(r.from).getTime() <= 43 * 86400_000 && r.to > r.from,
+  "기간이 올바르지 않아요",
+);
 
 export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Route[] {
   const routes: Route[] = [];
@@ -97,6 +102,12 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
       callProvider: calls.provider.name,
       simulatorScenario: simulator?.scenario ?? null,
     });
+  });
+
+  // 달력: 기간 안의 모든 부모님 일정 (지난 일정 포함)
+  r("GET", "/api/calendar", async (req) => {
+    const { from, to } = RangeZ.parse(req.query);
+    return reply(200, db.listSchedulesBetween(from, to).map(scheduleView));
   });
 
   r("POST", "/api/parents", async (req) => {
@@ -205,6 +216,15 @@ export function buildRoutes({ db, flow, calls, simulator, intake }: ApiDeps): Ro
     if (!p || !s || s.parent_id !== p.id) return null;
     return s;
   };
+
+  r("GET", "/api/p/:token/calendar", async (req) => {
+    const p = parentByToken(req);
+    if (!p) return reply(404, { error: "링크가 올바르지 않아요." });
+    const { from, to } = RangeZ.parse(req.query);
+    return reply(200, db.listSchedulesBetween(from, to, p.id).map((s) => ({
+      id: s.id, title: s.title, kind: s.kind, place_name: s.place_name, start_at: s.start_at, memo: s.memo, status: s.status,
+    })));
+  });
 
   r("POST", "/api/p/:token/choose", async (req) => {
     const s = ownSchedule(req);

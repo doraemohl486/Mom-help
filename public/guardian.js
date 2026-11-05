@@ -41,6 +41,14 @@ const openIds = new Set(); // 펼친 일정
 const openTranscripts = new Set();
 let seenNotif = 0;
 let view = "home";
+// 달력
+const todayKey0 = () => dayKey(nowDate());
+let calY = Number(todayKey0().slice(0, 4));
+let calM = Number(todayKey0().slice(5, 7)); // 1~12
+let selDay = todayKey0();
+let homeMode = "cal";
+let calData = [];
+let calLoaded = "";
 
 function toast(msg) {
   const t = $("#toast");
@@ -98,13 +106,32 @@ function askConflict(conflicts) {
   });
 }
 
+/** 한국 날짜 "YYYY-MM-DD" 의 0시 → Date */
+const kstMidnight = (key) => {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, -9));
+};
+const keyOf = (y, m, d) => `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+/** 달력에 보이는 6주(일요일 시작) */
+function calRange() {
+  const first = kstMidnight(keyOf(calY, calM, 1));
+  const firstWd = new Date(first.getTime() + 9 * 3600000).getUTCDay();
+  const start = new Date(first.getTime() - firstWd * 86400000);
+  return { start, end: new Date(start.getTime() + 42 * 86400000) };
+}
+
 async function refresh(force = false) {
   try {
-    const next = await api("GET", "/api/state");
-    const json = JSON.stringify(next);
+    const { start, end } = calRange();
+    const [next, cal] = await Promise.all([
+      api("GET", "/api/state"),
+      api("GET", `/api/calendar?from=${encodeURIComponent(start.toISOString())}&to=${encodeURIComponent(end.toISOString())}`),
+    ]);
+    const json = JSON.stringify([next, cal, calY, calM]);
     if (!force && json === lastJson) return; // 바뀐 게 없으면 다시 그리지 않음 (펼친 내용 유지)
     lastJson = json;
     state = next;
+    calData = cal;
     render();
   } catch (e) {
     console.error(e);
@@ -157,7 +184,10 @@ function render() {
   const todayKey = dayKey(nowDate());
   const tomorrowKey = dayKey(new Date(nowDate().getTime() + 86400000));
   const dayName = (k, d) => (k === todayKey ? "오늘" : k === tomorrowKey ? "내일" : fmtDay.format(d));
-  $("#upcomingTitle").hidden = !rest.length && !done.length;
+  $("#calWrap").hidden = homeMode !== "cal";
+  $("#schedules").hidden = homeMode !== "list";
+  for (const b of $("#homeMode").children) b.classList.toggle("on", b.dataset.v === homeMode);
+  renderCalendar(byId, nowList);
   $("#schedules").innerHTML = (rest.length || done.length)
     ? [...groups.entries()].map(([k, list]) => `
         <div class="day"><div class="day-label">${dayName(k, new Date(list[0].start_at))}</div>
@@ -197,6 +227,90 @@ function render() {
   $("#simBox").hidden = state.callProvider !== "simulator";
   for (const b of $("#scenario").children) b.classList.toggle("on", b.dataset.v === state.simulatorScenario);
 }
+
+// ---------------------------------------------------------------- 달력
+function renderCalendar(byId, nowList) {
+  const { start } = calRange();
+  const tKey = todayKey0();
+  const byDay = new Map();
+  for (const s of calData) {
+    const k = dayKey(new Date(s.start_at));
+    if (!byDay.has(k)) byDay.set(k, []);
+    byDay.get(k).push(s);
+  }
+  const cells = [];
+  // 마지막 줄이 모두 다음 달이면 5줄만
+  const rows = dayKey(new Date(start.getTime() + 35 * 86400000)).slice(5, 7) === String(calM).padStart(2, "0") ? 6 : 5;
+  for (let i = 0; i < rows * 7; i++) {
+    const d = new Date(start.getTime() + i * 86400000);
+    const k = dayKey(d);
+    const [, mm, dd] = k.split("-").map(Number);
+    const list = byDay.get(k) || [];
+    const cls = [
+      mm !== calM ? "out" : "", k === tKey ? "today" : "", k === selDay ? "sel" : "", k < tKey ? "past" : "",
+      i % 7 === 0 ? "sun" : i % 7 === 6 ? "sat" : "",
+    ].join(" ");
+    const dots = list.slice(0, 3).map((s) => `<i class="dot-p a${(byId[s.parent_id]?.idx ?? 0) % 3}"></i>`).join("");
+    const evs = list.slice(0, 2).map((s) => `<span class="cal-ev a${(byId[s.parent_id]?.idx ?? 0) % 3}">${esc(splitTime(new Date(s.start_at)).hm)} ${esc(s.place_name)}</span>`).join("");
+    cells.push(`<button type="button" class="cal-cell ${cls}" data-day="${k}" aria-label="${esc(k)} 일정 ${list.length}개">
+      <span class="cal-num">${dd}</span>
+      <span class="cal-dots">${dots}${list.length > 3 ? `<b>+${list.length - 3}</b>` : ""}</span>
+      <span class="cal-evs">${evs}${list.length > 2 ? `<span class="cal-more">+${list.length - 2}</span>` : ""}</span>
+    </button>`);
+  }
+  $("#calBox").innerHTML = `
+    <div class="cal-head">
+      <button type="button" class="btn small ghost" data-nav="-1" aria-label="이전 달">${ic("chevron").replace("<svg", '<svg style="transform:scaleX(-1)"')}</button>
+      <b class="cal-title">${calY}년 ${calM}월</b>
+      <button type="button" class="btn small ghost" data-nav="1" aria-label="다음 달">${ic("chevron")}</button>
+      <button type="button" class="btn small" data-nav="0" style="margin-left:auto">오늘</button>
+    </div>
+    <div class="cal-grid cal-wd">${["일", "월", "화", "수", "목", "금", "토"].map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
+    <div class="cal-grid">${cells.join("")}</div>
+    ${state.parents.length > 1 ? `<div class="cal-legend">${state.parents.map((p, i) => `<span><i class="dot-p a${i % 3}"></i>${esc(p.name)}</span>`).join("")}</div>` : ""}`;
+
+  // 고른 날의 일정
+  const sel = new Date(kstMidnight(selDay).getTime() + 12 * 3600000);
+  const heroIds = new Set(nowList.map((s) => s.id));
+  const dayList = (byDay.get(selDay) || []).filter((s) => !heroIds.has(s.id));
+  const title = `${selDay === tKey ? "오늘 · " : ""}${fmtDay.format(sel)}`;
+  $("#dayBox").innerHTML = `<div class="day-label">${esc(title)}</div>` + (dayList.length
+    ? dayList.map((s) => scheduleCard(s, byId[s.parent_id], false)).join("")
+    : `<div class="card empty" style="padding:18px"><b>${(byDay.get(selDay) || []).length ? "위에 보이는 일정뿐이에요" : "이날은 일정이 없어요"}</b>
+        <button type="button" class="btn small" onclick="openScheduleDialog(undefined, '${selDay}')" ${selDay < tKey ? "hidden" : ""}>${ic("plus")}이날 일정 추가</button></div>`);
+}
+
+function moveMonth(delta) {
+  if (delta === 0) {
+    const k = todayKey0();
+    calY = Number(k.slice(0, 4));
+    calM = Number(k.slice(5, 7));
+    selDay = k;
+  } else {
+    calM += delta;
+    if (calM < 1) { calM = 12; calY--; }
+    if (calM > 12) { calM = 1; calY++; }
+    selDay = keyOf(calY, calM, 1);
+  }
+  refresh(true);
+}
+
+$("#calBox").addEventListener("click", (e) => {
+  const nav = e.target.closest("[data-nav]");
+  if (nav) return moveMonth(Number(nav.dataset.nav));
+  const cell = e.target.closest("[data-day]");
+  if (!cell) return;
+  selDay = cell.dataset.day;
+  const [y, m] = selDay.split("-").map(Number);
+  if (y !== calY || m !== calM) { calY = y; calM = m; return refresh(true); }
+  render();
+});
+$("#homeMode").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-v]");
+  if (!b) return;
+  homeMode = b.dataset.v;
+  render();
+});
 
 function steps(s) {
   const names = ["알림", "교통수단", "택시 호출", "배차", "도착"];
@@ -520,7 +634,7 @@ $("#parseBtn").onclick = async () => {
   $("#parseBtn").disabled = false;
 };
 
-function openScheduleDialog(parentId) {
+function openScheduleDialog(parentId, dateKey) {
   if (!state?.parents.length) return openParentDialog();
   schedForm.reset();
   schedForm.draft_id.value = "";
@@ -537,6 +651,7 @@ function openScheduleDialog(parentId) {
   };
   schedKind = "병원";
   for (const b of $("#kindSeg").children) b.classList.toggle("on", b.dataset.v === schedKind);
+  if (dateKey) schedForm.start_local.value = `${dateKey}T10:00`;
   schedDlg.showModal();
 }
 schedForm.addEventListener("submit", async (e) => {

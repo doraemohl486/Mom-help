@@ -275,6 +275,14 @@ export function openDb(file: string) {
         `SELECT * FROM schedules WHERE start_at BETWEEN ? AND ? AND status NOT IN ('cancelled','arrived') ORDER BY start_at`,
         fromIso, toIso,
       ),
+    /** 달력용: 기간 안의 일정 (취소 제외). parentId가 null이면 모든 부모님 */
+    listSchedulesBetween: (fromIso: string, toIso: string, parentId: number | null = null) =>
+      parentId === null
+        ? all<Schedule>(`SELECT * FROM schedules WHERE start_at >= ? AND start_at < ? AND status != 'cancelled' ORDER BY start_at`, fromIso, toIso)
+        : all<Schedule>(
+            `SELECT * FROM schedules WHERE parent_id=? AND start_at >= ? AND start_at < ? AND status != 'cancelled' ORDER BY start_at`,
+            parentId, fromIso, toIso,
+          ),
     updateSchedule(id: number, fields: Partial<Omit<Schedule, "id">>) {
       const keys = Object.keys(fields) as (keyof typeof fields)[];
       if (!keys.length) return;

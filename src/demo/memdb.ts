@@ -68,6 +68,9 @@ export function openMemDb(initial?: Tables): { db: Db; dump: () => Tables } {
     listActiveSchedules: (fromIso: string, toIso: string) =>
       t.schedules.filter((s) => s.start_at >= fromIso && s.start_at <= toIso && !["cancelled", "arrived"].includes(s.status))
         .sort(byStart).map((s) => ({ ...s })),
+    listSchedulesBetween: (fromIso: string, toIso: string, pid: number | null = null) =>
+      t.schedules.filter((s) => s.start_at >= fromIso && s.start_at < toIso && s.status !== "cancelled" && (pid === null || s.parent_id === pid))
+        .sort(byStart).map((s) => ({ ...s })),
     updateSchedule(sid: number, fields: Partial<Omit<Schedule, "id">>) {
       const row = t.schedules.find((x) => x.id === sid);
       if (row) Object.assign(row, fields);
