@@ -329,3 +329,26 @@ test("직접 넣은 일정: 종류를 안 고르면 제목·장소로 정함", a
     server.close();
   }
 });
+
+test("자동 가져오기는 병원 예약 문자만: 모임·경조사 문자는 저장도 알림도 없음", async () => {
+  const { svc, parent } = setup();
+  const now = fromSeoulLocal("2026-11-12T09:00");
+  const before = { drafts: svc.db.raw.prepare("SELECT COUNT(*) n FROM drafts").get() as { n: number }, notes: svc.db.listNotifications("guardian", null).length };
+  for (const personal of [
+    "[OO초등학교 동창회] 11/14(토) 낮 12시 종로구 탑골공원 앞에서 모여요",
+    "[부고] 김OO님 모친상. 세브란스병원 장례식장 3호실, 발인 11/15 오전 8시",
+    "조카 결혼식 11/21(토) 오후 1시 마포 OO웨딩홀",
+    "수요일 오후 2시 복지관 노래교실 개강합니다",
+  ]) {
+    assert.equal((await svc.intake.fromSms(parent.id, personal, now)).result, "ignored", personal);
+  }
+  const after = svc.db.raw.prepare("SELECT COUNT(*) n FROM drafts").get() as { n: number };
+  assert.equal(after.n, before.drafts.n, "개인 문자는 임시로도 저장하지 않음");
+  assert.equal(svc.db.listNotifications("guardian", null).length, before.notes, "자녀에게도 알리지 않음");
+  // 병원 예약은 그대로 들어옴
+  const r = await svc.intake.fromSms(parent.id, "[서울아산병원] 김영희님 11/27(금) 오후 2시 심장내과 진료 예약", now);
+  assert.equal(r.result, "created");
+  // 직접 붙여 넣은 모임 문자는 넣을 수 있음 (자녀가 고른 것)
+  const pasted = await svc.intake.draftFromText(parent.id, "[동창회] 11/14(토) 낮 12시 종로구 탑골공원", "guardian", now);
+  assert.equal(pasted?.kind, "모임");
+});

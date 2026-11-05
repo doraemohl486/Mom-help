@@ -501,15 +501,15 @@ function draftCard(d, p) {
 }
 
 function inboxHelp(parents) {
-  return `<p class="muted">부모님 폰에 온 예약·약속 문자(병원, 모임, 경조사 등)를 이 주소로 넘기면 일정이 알아서 생겨요. 같은 예약 문자가 또 오면 건너뛰고, 애매하면 '확인이 필요해요'에 올려요.</p>`
+  return `<p class="muted">부모님 폰에 온 <b>병원 예약 문자만</b> 일정으로 가져와요. 모임·경조사 같은 개인 문자는 가져오지도, 저장하지도, 알리지도 않아요. 같은 예약 문자가 또 오면 건너뛰고, 애매하면 '확인이 필요해요'에 올려요.</p>`
     + parents.map((p) => {
       const url = `${location.origin}/api/inbox/${p.token}`;
       return `<div class="stack tight"><b>${esc(p.name)} 폰</b><div class="mono">${esc(url)}</div>
         <div><button class="btn small" type="button" onclick="copyText('${esc(url)}')">주소 복사</button></div></div>`;
     }).join("") + `
     <details class="more"><summary>폰 설정 방법</summary><div class="stack tight">
-      <p class="muted"><b>아이폰</b> · 단축어 → 자동화 → 메시지 → '예약'·'일정'·'초대' 포함 → 즉시 실행 → 'URL 콘텐츠 가져오기'에 위 주소, 방법 POST, 본문에 '메시지'</p>
-      <p class="muted"><b>안드로이드</b> · 문자 웹훅 전달 앱에서 '예약'·'일정'·'초대'가 들어간 문자를 위 주소로 POST</p>
+      <p class="muted"><b>아이폰</b> · 단축어 → 자동화 → 메시지 → '진료'·'병원'·'의원'·'검진' 중 하나 포함 → 즉시 실행 → 'URL 콘텐츠 가져오기'에 위 주소, 방법 POST, 본문에 '메시지'</p>
+      <p class="muted"><b>안드로이드</b> · 문자 웹훅 전달 앱에서 '진료'·'병원'·'의원'·'검진'이 들어간 문자만 위 주소로 POST</p>
     </div></details>`;
 }
 

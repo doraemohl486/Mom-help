@@ -92,12 +92,12 @@
 
       <div class="card">
         <b>📩 <span class="pname">엄마</span> 폰에 문자 오기</b>
-        <p class="demo-note">실제 앱에서는 부모님 폰의 예약·약속 문자(병원, 모임, 경조사 등)가 자동으로 넘어와요. 여기서 흉내 내 보세요.</p>
+        <p class="demo-note">실제 앱에서는 부모님 폰의 <b>병원 예약 문자만</b> 자동으로 넘어와요. 모임·경조사 같은 개인 문자는 남기지 않아요. 여기서 흉내 내 보세요.</p>
         <div class="seg" id="smsSamples">
-          <button type="button" data-s="meet">모임 공지</button>
           <button type="button" data-s="new">병원 예약</button>
           <button type="button" data-s="dup">같은 예약 안내 (중복)</button>
           <button type="button" data-s="unknown">모르는 곳</button>
+          <button type="button" data-s="meet">동창회 (안 가져옴)</button>
           <button type="button" data-s="ad">광고</button>
         </div>
         <textarea id="smsText"></textarea>
@@ -115,7 +115,7 @@
           <li>'+ 일정 추가' → 📋 예약 문자 붙여넣기 → 자동으로 채우기</li>
           <li>같은 일정을 한 번 더 저장 → 중복 팝업</li>
           <li>👵 엄마 화면 📝 일정 알려주기 → "토요일 낮 12시 종로에서 동창 모임"</li>
-          <li>위 📩 문자 오기 → 자동으로 일정 생성 / 중복은 건너뜀</li>
+          <li>위 📩 문자 오기 → 병원 예약은 자동으로 일정 생성 / 중복은 건너뜀 / 동창회 같은 개인 문자는 안 가져옴</li>
           <li>자녀 화면 맨 아래 '배차 불가' 고르고 택시 → 3번 재시도 후 자녀에게</li>
         </ol>
         <p class="demo-note">체험판은 실제 전화를 걸지 않고 가상 콜센터와 통화해요. 운영 시간 제한도 없어요 (실제는 8~22시).

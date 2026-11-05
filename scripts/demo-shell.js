@@ -104,7 +104,7 @@
     created: "✅ 일정을 자동으로 넣었어요 (자녀 화면 확인)",
     duplicate: "↩️ 이미 있는 예약이라 건너뛰었어요",
     review: "📝 자녀 화면 '확인이 필요한 일정'에 올렸어요",
-    ignored: "🚫 예약 문자가 아니라서 무시했어요",
+    ignored: "🔒 병원 예약 문자가 아니라서 가져오지 않았어요 (내용도 남기지 않아요)",
   };
   q("#smsSend").onclick = async () => {
     const p = currentParent();

@@ -50,6 +50,13 @@ export function describeConflict(c: Conflict): string {
   return `${formatDate(d)} ${formatTime(d)} ${c.place_name}${c.title ? ` (${c.title})` : ""}`;
 }
 
+/** 병원·의원·검진 같은 진료 예약 문자인지 (부고·장례식장처럼 병원 이름이 들어간 개인 문자는 제외) */
+export function isMedicalMessage(raw: string, parsedKind: string): boolean {
+  const k = guessKind(raw);
+  if (k === "경조사") return false;
+  return parsedKind === "병원" || k === "병원";
+}
+
 export class Intake {
   private db: Db;
   private flow: TripFlow;
@@ -82,11 +89,15 @@ export class Intake {
   }
 
   /** 글(문자·말)을 읽어 임시 일정을 만든다. 일정이 아니면 null */
-  async draftFromText(parentId: number, text: string, source: ScheduleSource, now = new Date()): Promise<Draft | null> {
+  async draftFromText(
+    parentId: number, text: string, source: ScheduleSource, now = new Date(), opts: { medicalOnly?: boolean } = {},
+  ): Promise<Draft | null> {
     const raw = text.trim().slice(0, 2000);
     if (!raw) return null;
     const p = await this.parser.parse(raw, now);
     if (!p.is_appointment) return null;
+    // 자동 가져오기는 병원 예약만: 모임·경조사 같은 개인 문자는 저장하지 않고 버린다
+    if (opts.medicalOnly && !isMedicalMessage(raw, p.kind)) return null;
     let place = { name: p.place_name, address: "", lat: null as number | null, lng: null as number | null };
     if (p.place_name) {
       const found = (await searchExactPlaces(p.place_name, { online: true }).catch(() => []))[0];
@@ -146,15 +157,15 @@ export class Intake {
   }
 
   /**
-   * 부모님 폰에서 전달된 예약 문자 처리.
+   * 부모님 폰에서 전달된 예약 문자 처리. 병원 예약 문자만 다루고 나머지는 저장하지 않는다.
    * - 정보가 다 있고 겹치는 일정이 없으면 바로 저장
    * - 같은 예약 문자가 또 오면 (병원은 확정·전날 안내를 여러 번 보냄) 건너뜀
    * - 그 밖에는 자녀가 확인하도록 남겨 둠
    */
   async fromSms(parentId: number, text: string, now = new Date()) {
     const parent = this.db.getParent(parentId)!;
-    const d = await this.draftFromText(parentId, text, "sms", now);
-    if (!d) return { result: "ignored" as const };
+    const d = await this.draftFromText(parentId, text, "sms", now, { medicalOnly: true });
+    if (!d) return { result: "ignored" as const }; // 병원 예약이 아니거나 일정이 아님: 아무것도 남기지 않음
     const view = this.draftView(d);
     const when = d.start_at ? `${formatDate(new Date(d.start_at))} ${formatTime(new Date(d.start_at))}` : "";
 
