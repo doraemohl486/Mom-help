@@ -70,10 +70,23 @@ splash.innerHTML = `<div class="splash-in">
 </div>`;
 app.parentElement.insertBefore(splash, app);
 const splashStart = Date.now();
+let splashFrom = splashStart;
 function hideSplash() {
   if (splash.classList.contains("done")) return;
-  setTimeout(() => splash.classList.add("done"), Math.max(0, 1200 - (Date.now() - splashStart)));
+  setTimeout(() => splash.classList.add("done"), Math.max(0, 1200 - (Date.now() - splashFrom)));
 }
+// 다른 앱에 갔다가 다시 열면 시작 화면부터
+let hiddenAt = 0;
+function replaySplash() {
+  splash.classList.remove("done");
+  splashFrom = Date.now();
+  void load().finally(hideSplash);
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else if (hiddenAt && Date.now() - hiddenAt > 1500) replaySplash();
+});
+window.addEventListener("pageshow", (e) => { if (e.persisted) replaySplash(); });
 
 async function load() {
   let res;

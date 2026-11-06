@@ -891,3 +891,18 @@ refresh(true).finally(() => {
   setTimeout(() => $("#gSplash")?.classList.add("done"), Math.max(0, 1200 - (Date.now() - splashStart)));
 });
 setInterval(refresh, 2500);
+
+// 다른 앱에 갔다가 다시 열면 시작 화면부터 (적던 내용은 그대로 두고 새 소식만 받아 옴)
+let hiddenAt = 0;
+function replaySplash() {
+  const sp = $("#gSplash");
+  if (!sp) return;
+  sp.classList.remove("done");
+  const t0 = Date.now();
+  refresh(true).finally(() => setTimeout(() => sp.classList.add("done"), Math.max(0, 1200 - (Date.now() - t0))));
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else if (hiddenAt && Date.now() - hiddenAt > 1500) replaySplash();
+});
+window.addEventListener("pageshow", (e) => { if (e.persisted) replaySplash(); });
