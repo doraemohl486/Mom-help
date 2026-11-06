@@ -320,7 +320,6 @@ async function openCalendar(y, m) {
   };
   const yearPrefix = pcY !== Number(today.slice(0, 4)) ? `${pcY}년 ` : "";
   frame({
-    back: true,
     title: "달력",
     main: `
       <div class="card pc">
@@ -333,7 +332,12 @@ async function openCalendar(y, m) {
         <div class="pc-grid" id="pcGrid">${weeks.join("")}</div>
       </div>
       <div class="card next-list" id="pcDay" aria-live="polite">${dayPanel(pcSel)}</div>`,
+    // 홈의 [달력] 자리에 [달력 접기]: 같은 자리를 다시 누르면 닫힘
+    bottom: `<button class="bigbtn dark" id="calClose" type="button" data-voice="back">${ic("up")}달력 접기</button>
+      <button class="bigbtn ghost" id="addSched" type="button" data-voice="add">${ic("edit")}일정 알려주기</button>`,
   });
+  document.getElementById("calClose").onclick = backHome;
+  document.getElementById("addSched").onclick = () => openInput();
   document.getElementById("prevM").onclick = () => openCalendar(pcM === 1 ? pcY - 1 : pcY, pcM === 1 ? 12 : pcM - 1);
   document.getElementById("nextM").onclick = () => openCalendar(pcM === 12 ? pcY + 1 : pcY, pcM === 12 ? 1 : pcM + 1);
   document.getElementById("pcGrid").onclick = (e) => {

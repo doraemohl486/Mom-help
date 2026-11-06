@@ -494,3 +494,34 @@ details.more > summary { cursor: pointer; color: var(--sub); font-size: var(--t2
 .avatar-pick { grid-template-columns: repeat(3, 1fr); }
 .avatar-pick button { height: auto; padding: var(--s2) var(--s1); display: grid; justify-items: center; gap: var(--s1); font-size: var(--t1); font-weight: 700; color: var(--sub); }
 .avatar-pick button svg { background: var(--brand-soft); border-radius: 50%; }
+
+/* ---------------- 부모님 화면 글씨 3단계 + 교통수단 칸 가운데 맞춤 ----------------
+   큰 글씨(28): 질문·장소·상태 제목·교통수단 이름 / 보통(22): 본문·버튼·목록 / 작은 글씨(18): 날짜·설명·꼬리표 */
+.big { --fs-l: var(--b3); --fs-m: var(--b2); --fs-s: var(--b1); }
+.big .p-date { font-size: var(--fs-s); }
+.big .app-top .p-hello { font-size: var(--fs-m); }
+.big .appt-meta { font-size: var(--fs-m); color: var(--ink); }
+.big .appt-meta .tag { font-size: var(--fs-s); }
+.big .status p { font-size: var(--fs-m); }
+.big .next-list h3 { font-size: var(--fs-s); }
+.big .next-row { font-size: var(--fs-m); }
+.big .next-row small { font-size: var(--fs-s); }
+.big .p-bottom .bigbtn { font-size: var(--fs-m); gap: var(--s1); padding: 0 var(--s1); }
+.big .p-bottom .bigbtn svg { font-size: var(--fs-m); }
+.big .choice .badge { font-size: var(--fs-s); }
+.big .voice-live, .big .heard { font-size: var(--fs-m); }
+.big .rest-text b { font-size: var(--fs-m); }
+.big .rest-text span { font-size: var(--fs-s); }
+.big .question { margin-top: 0; }
+/* 교통수단 칸: 글씨 높이에 맞춘 높이, 위아래 가운데 */
+.choice { min-height: 76px; padding: var(--s2) var(--s4); align-items: center; }
+.choice > span:last-child { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
+.choice .t { line-height: 1.1; }
+.choice .d { line-height: 1.25; }
+/* 한 화면에 들어오도록 간격 다듬기 */
+.big .app-top { padding-top: calc(var(--s2) + env(safe-area-inset-top)); padding-bottom: var(--s2); }
+.choice { min-height: 72px; padding: 6px var(--s4); }
+.big .tag { min-height: 28px; }
+.pc { padding: var(--s2); }
+.pc-cell { height: 40px; }
+.pc-cell.sel, .pc-cell.sel.sat, .pc-cell.sel.sun { color: var(--surface) !important; }

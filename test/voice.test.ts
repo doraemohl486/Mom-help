@@ -56,3 +56,8 @@ test("자녀에게 보여줄까요? — 보여줘 / 나만 볼게", () => {
   assert.equal(first("안 보여줘도 돼", yn), "no");
   assert.equal(first("보여주지 마", yn), "no");
 });
+
+test("달력 접기", () => {
+  assert.equal(first("달력 접어", ["back"]), "back");
+  assert.equal(first("달력 접기", ["back"]), "back");
+});
