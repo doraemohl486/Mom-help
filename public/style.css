@@ -547,3 +547,67 @@ details.more > summary { cursor: pointer; color: var(--sub); font-size: var(--t2
 
 .wide-text { right: auto; max-width: 54%; }
 .wide-text b { display: inline; -webkit-box-decoration-break: clone; box-decoration-break: clone; line-height: 1.55; }
+
+/* ---------------------------------------------------------------- 엄마 화면 다듬기 (따뜻하게 · 한눈에)
+   위쪽은 연한 노란빛, 머리에 내 얼굴, 일정 카드에 걸어가는 내 캐릭터 */
+.big .p-app { background: linear-gradient(180deg, var(--brand-soft) 0, var(--bg) 260px); }
+.big .app-top { gap: var(--s2); }
+.p-face { flex: none; width: 52px; height: 52px; border-radius: 50%; background: var(--surface); border: 2px solid var(--brand); display: grid; place-items: center; overflow: hidden; }
+.p-face svg { display: block; }
+.big .p-title { display: flex; flex-direction: column-reverse; gap: 0; }
+.big .app-top .p-hello { font-size: var(--fs-m); line-height: 1.2; }
+.big .p-date { font-size: var(--t2); line-height: 1.3; }
+.big .app-top .round-btn { width: 52px; height: 52px; }
+.big .p-mic { height: 52px; padding: 0 var(--s3); }
+
+.big .appt { position: relative; overflow: hidden; padding: var(--s3) var(--s4); padding-right: 96px; border: 0; box-shadow: 0 6px 18px rgb(23 32 58 / .08); gap: 2px; }
+.big .appt::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 8px; background: var(--brand); }
+.appt-fig { position: absolute; right: 8px; bottom: -6px; width: 64px; height: 138px; pointer-events: none; }
+.big .appt > .tag.count { position: absolute; top: var(--s3); right: var(--s3); z-index: 1; min-height: 30px; font-size: var(--t2); padding: 0 var(--s2); }
+.big .appt-when .num { font-size: 44px; }
+.big .appt-day { font-size: var(--fs-s); }
+.big .appt-place { font-size: var(--fs-l); }
+.big .appt-meta { font-size: var(--fs-s); color: var(--sub); }
+.big .appt-meta .tag { font-size: var(--t2); min-height: 28px; }
+
+.big .question { font-size: var(--fs-l); margin: var(--s2) 0 var(--s1); }
+.big .choice { box-shadow: 0 2px 8px rgb(23 32 58 / .05); }
+.big .choice.rec { box-shadow: 0 6px 18px rgb(255 201 60 / .35); }
+
+.p-hint { font-size: var(--fs-s); color: var(--sub); text-align: center; padding: var(--s2) var(--s3); }
+.p-hint b { color: var(--ink); }
+.p-rest .rest-text { flex-direction: column; align-items: flex-start; gap: 2px; }
+
+/* 상태 카드(예약함·고름)는 작게 */
+.big .status { padding: var(--s4) var(--s4); gap: var(--s1); }
+.big .status .big-ic { width: 56px; height: 56px; font-size: var(--b3); }
+.big .next-list { padding: var(--s2) var(--s4); }
+.big .next-row { padding: var(--s2) 0; }
+/* 머리 줄: 말하기는 동그란 버튼 + 아래 작은 글씨 (인사가 한 줄에) */
+.big .p-tools { align-items: center; }
+.big .app-top .p-mic { width: 56px; height: 56px; padding: 0; border-radius: 50%; flex-direction: column; justify-content: center; gap: 0; font-size: 12px; line-height: 1; box-shadow: 0 0 0 3px var(--brand); }
+.big .app-top .p-mic svg { font-size: 24px; }
+.big .app-top .round-btn { width: 48px; height: 48px; }
+.big .app-top .p-hello { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p-face { width: 48px; height: 48px; }
+/* 일정 카드: 날짜·남은 시간 / 시각 / 장소 / 메모, 오른쪽에 캐릭터 */
+.big .appt { padding-right: 84px; }
+.appt-top { display: flex; align-items: center; gap: var(--s2); font-size: var(--fs-s); font-weight: 700; color: var(--sub); }
+.big .appt-top .tag.count { min-height: 26px; font-size: var(--t2); padding: 0 var(--s2); }
+.appt-fig { right: 6px; bottom: -4px; width: 60px; height: 128px; }
+.big .appt-when .num { font-size: 42px; }
+/* 작은 가로 상태 카드 */
+.big .status.mini { grid-template-columns: auto 1fr; justify-items: start; text-align: left; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); }
+.big .status.mini h2 { font-size: var(--fs-m); }
+.big .status.mini p { font-size: var(--fs-s); }
+.big .status.mini p b { color: var(--ink); }
+.big .status.mini .big-ic { width: 48px; height: 48px; font-size: var(--b2); }
+/* 카드가 눌려 잘리지 않게: overflow 대신 왼쪽 띠는 테두리로 */
+.big .appt { overflow: visible; border-left: 8px solid var(--brand); padding-left: var(--s3); }
+.big .appt::before { content: none; }
+.appt-fig { bottom: 0; height: 120px; }
+.big .appt-when .num { font-size: 38px; }
+.big .question { margin: var(--s1) 0 0; }
+.big .choice { min-height: 66px; }
+.big .p-main { gap: var(--s2); }
+@media (prefers-color-scheme: dark) { .big .app-top .p-mic svg { color: var(--surface); } }

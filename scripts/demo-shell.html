@@ -27,7 +27,9 @@
 /* 팝업·안내가 고른 화면(폰 틀) 안에만 뜨도록 */
 .pane .modal-back, .pane .voice-back, .pane .heard, .phone .toast { position: absolute; }
 #phoneBanner { position: absolute; top: var(--s2); left: var(--s3); right: var(--s3); z-index: 45; display: grid; gap: var(--s2); pointer-events: none; }
-.banner { background: var(--ink); color: var(--surface); border-radius: var(--r2); padding: var(--s3) var(--s4); font-size: var(--t3); line-height: 1.4; box-shadow: var(--shadow); animation: drop .25s ease-out; }
+.banner { background: rgb(23 32 58 / .92); color: #fff; border-radius: var(--r2); padding: var(--s2) var(--s3); font-size: var(--t2); line-height: 1.4; box-shadow: var(--shadow); animation: drop .25s ease-out; pointer-events: auto; cursor: pointer;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; transition: opacity .4s; }
+.banner.out { opacity: 0; }
 @keyframes drop { from { transform: translateY(-8px); opacity: 0; } }
 .tools { max-width: 480px; margin: 0 auto; padding: var(--s4); display: grid; gap: var(--s3); }
 .tools .card { display: grid; gap: var(--s2); }

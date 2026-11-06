@@ -115,7 +115,7 @@ async function load() {
 
 // ---------------------------------------------------------------- 틀
 function micBtn() {
-  return `<button class="p-mic" type="button" data-mic aria-label="말로 하기">${ic("mic")}<span>말하기</span></button>`;
+  return `<button class="p-mic" type="button" data-mic aria-label="말하기">${ic("mic")}<span>말하기</span></button>`;
 }
 
 /** 위: 제목 + 🔊 + 🎤 / 가운데: 내용 / 아래: 버튼 줄 */
@@ -143,9 +143,12 @@ const HOME_BOTTOM = `
 
 function shell(main, foot = true) {
   // 아이콘은 날짜 줄에 (인사말이 한 줄에 들어가게)
-  const face = window.PEOPLE ? `<span class="mini-face">${window.PEOPLE.faceSvg(window.PEOPLE.resolve(data.parent.avatar, data.parent.name), 22)}</span>` : "";
-  const sub = `${face}${esc(longDay.format(nowDate()))}`;
-  frame({ sub, title: `${esc(data.parent.name)}, 안녕하세요`, main, bottom: foot ? HOME_BOTTOM : "" });
+  frame({ sub: esc(longDay.format(nowDate())), title: `${esc(data.parent.name)}, 안녕하세요`, main, bottom: foot ? HOME_BOTTOM : "" });
+  // 머리 왼쪽에 내 캐릭터 얼굴 (따뜻한 느낌)
+  if (window.PEOPLE) {
+    app.querySelector(".p-title")?.insertAdjacentHTML("beforebegin",
+      `<span class="p-face">${window.PEOPLE.faceSvg(window.PEOPLE.resolve(data.parent.avatar, data.parent.name), 46)}</span>`);
+  }
   const b = document.getElementById("addSched");
   if (b) b.onclick = () => openInput();
   const c = document.getElementById("openCal");
@@ -156,8 +159,11 @@ function apptCard(s) {
   const d = new Date(s.start_at);
   const t = splitTime(d);
   const cd = countdown(d);
-  return `<div class="card appt">
-    <div class="appt-when"><span class="appt-day">${esc(dayWord(d))} ${esc(t.ampm)}</span><span class="num">${esc(t.hm)}</span>${cd ? `<span class="tag count">${esc(cd)}</span>` : ""}</div>
+  const me = window.PEOPLE ? window.PEOPLE.resolve(data.parent.avatar, data.parent.name) : "";
+  const fig = me ? `<svg class="appt-fig" viewBox="-26 -18 52 112" aria-hidden="true">${window.PEOPLE.figure(me, 0, 0, 1, "walk")}</svg>` : "";
+  return `<div class="card appt">${fig}
+    <div class="appt-top"><span>${esc(dayWord(d))}</span>${cd ? `<span class="tag count">${esc(cd)}</span>` : ""}</div>
+    <div class="appt-when"><span class="appt-day">${esc(t.ampm)}</span><span class="num">${esc(t.hm)}</span></div>
     <div class="appt-place">${ic(s.kind) || ic("기타")}<span>${esc(s.place_name)}</span></div>
     <div class="appt-meta"><span>${esc(s.title)}</span>${s.memo ? `<span class="tag memo">${esc(s.memo)}</span>` : ""}${s.shared === 0 ? `<span class="tag lock">🔒 나만 보기</span>` : ""}</div>
   </div>`;
@@ -165,7 +171,7 @@ function apptCard(s) {
 
 function upcomingList() {
   if (!data.upcoming.length) return "";
-  return `<div class="card next-list"><h3>다음 일정</h3>${data.upcoming.map((u) => {
+  return `<div class="card next-list"><h3>다음 일정</h3>${data.upcoming.slice(0, 2).map((u) => {
     const d = new Date(u.start_at);
     return `<div class="next-row"><span class="num">${esc(seoulDay(d) === seoulDay(nowDate()) ? time.format(d) : shortDay.format(d))}</span><span>${esc(u.place_name)}</span></div>`;
   }).join("")}</div>`;
@@ -182,10 +188,9 @@ function render() {
     const sc = window.SCENES ? window.SCENES.sceneSvg(`${data.parent.name}-${today}`, data.parent.avatar, data.parent.name) : null;
     sayText = `오늘은 일정이 없어요. ${sc ? `${sc.caption}이에요. ` : ""}즐거운 하루 보내세요. 갈 곳이 생기면 일정 알려주기를 눌러 주세요.`;
     shell(sc
-      ? `<div class="card rest-card">${sc.html}
-          <div class="rest-text"><b>오늘은 일정이 없어요</b><span>${esc(sc.caption)}</span></div></div>
-        <div class="card status"><h2>즐거운 하루 보내세요 😊</h2>
-          <p>약속이나 갈 곳이 생기면<br>아래 '일정 알려주기'를 눌러 주세요.</p></div>`
+      ? `<div class="card rest-card p-rest">${sc.html}
+          <div class="rest-text"><b>오늘은 일정이 없어요</b><span>${esc(sc.caption)}, 즐거운 하루 보내세요</span></div></div>
+        <p class="p-hint">갈 곳이 생기면 아래 <b>일정 알려주기</b>를 눌러 주세요.</p>`
       : `<div class="card status"><div class="big-ic ok">${ic("check")}</div><h2>예정된 일정이 없어요</h2>
       <p>약속이나 갈 곳이 생기면<br>아래 '일정 알려주기'를 눌러 주세요.</p></div>`);
     return;
@@ -221,11 +226,9 @@ function render() {
   if (s.status === "taxi_reserved" && s.taxi_call_at) {
     const c = splitTime(new Date(s.taxi_call_at));
     sayText = `${whenSay(s)} 가시죠. ${time.format(new Date(s.taxi_call_at))}에 택시 불러 드릴게요.`;
-    shell(apptCard(s) + `<div class="card status">
+    shell(apptCard(s) + `<div class="card status mini">
         <div class="big-ic ok">${ic("clock")}</div>
-        <h2>택시 예약했어요</h2>
-        <div class="clock"><span>${esc(c.ampm)}</span><span class="num">${esc(c.hm)}</span></div>
-        <p>이 시간에 AI 비서가 택시를 불러 드려요.</p>
+        <div><h2>택시 예약했어요</h2><p><b>${esc(c.ampm)} ${esc(c.hm)}</b>에 AI 비서가 불러 드려요</p></div>
       </div>
       <button class="bigbtn" id="now" type="button" data-voice="now taxi">${ic("taxi")}지금 바로 불러줘</button>` + upcomingList());
     document.getElementById("now").onclick = () => post("call-now", {}, "지금 택시 불러 드릴게요");
@@ -239,8 +242,8 @@ function render() {
     const msg = transit
       ? `약 ${t?.durationMin ?? "?"}분 · 걷기 ${t?.walkMeters ?? "?"}m${s.departure_at ? `<br>${esc(time.format(new Date(s.departure_at)))}쯤 나가세요` : ""}`
       : "자녀에게 부탁했어요.<br>곧 연락 올 거예요.";
-    shell(apptCard(s) + `<div class="card status"><div class="big-ic ok">${ic(MODE[s.chosen_mode].icon)}</div>
-        <h2>${MODE[s.chosen_mode].t}${transit ? "로 가요" : ""}</h2><p>${msg}</p></div>
+    shell(apptCard(s) + `<div class="card status mini"><div class="big-ic ok">${ic(MODE[s.chosen_mode].icon)}</div>
+        <div><h2>${MODE[s.chosen_mode].t}${transit ? "로 가요" : ""}</h2><p>${msg}</p></div></div>
       <button class="bigbtn" id="arrived" type="button" data-voice="arrived">${ic("check")}도착했어요</button>` + upcomingList());
     document.getElementById("arrived").onclick = () => post("arrived", {}, "자녀에게 알렸어요. 잘 다녀오세요!");
     return;
@@ -250,7 +253,8 @@ function render() {
   const cmp = s.route_options;
   const failed = s.status === "call_failed"
     ? `<div class="card status bad"><div class="big-ic sm bad">${ic("warn")}</div><h2>택시를 못 불렀어요</h2><p>자녀에게 알렸어요. 다른 방법을 골라도 돼요.</p></div>` : "";
-  const choices = cmp ? cmp.options.map((o) => {
+  const ordered = cmp ? [...cmp.options].sort((a, b) => (b.mode === cmp.recommended) - (a.mode === cmp.recommended)) : [];
+  const choices = cmp ? ordered.map((o) => {
     const m = MODE[o.mode];
     const detail = o.mode === "family" ? "자녀에게 부탁하기"
       : `${o.durationMin}분${o.costWon ? ` · 약 ${o.costWon.toLocaleString()}원` : ""}${o.walkMeters ? ` · 걷기 ${o.walkMeters}m` : ""}`;
@@ -261,9 +265,7 @@ function render() {
   }).join("") : "";
   sayText = cmp ? `${whenSay(s)} 가셔야 해요. 뭐 타고 가실래요? ${cmp.reason} 추천은 ${MODE[cmp.recommended].t}예요.` : whenSay(s);
   shell(apptCard(s) + failed + `<p class="question">뭐 타고 가실래요?</p>
-    ${cmp ? `<p class="p-reason">${esc(cmp.reason)}</p>` : ""}
-    ${choices}
-    <p class="voice-hint">${ic("mic")}말로 해도 돼요: "택시", "버스", "아들이 태워줘"</p>` + upcomingList());
+    ${choices}`);
   for (const b of app.querySelectorAll(".choice")) {
     b.onclick = () => {
       const m = b.dataset.mode;

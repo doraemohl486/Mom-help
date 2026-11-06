@@ -60,9 +60,11 @@
       const div = document.createElement("div");
       div.className = "banner";
       div.innerHTML = `📱 <b>알림</b> · ${safe(n.message)}`;
-      q("#phoneBanner").prepend(div);
-      while (q("#phoneBanner").children.length > 2) q("#phoneBanner").lastChild.remove();
-      setTimeout(() => div.remove(), 12000);
+      // 알림은 하나만, 두 줄로 짧게, 5초 뒤 사라짐 (누르면 바로 닫힘) — 화면을 가리지 않게
+      q("#phoneBanner").replaceChildren(div);
+      const close = () => { div.classList.add("out"); setTimeout(() => div.remove(), 400); };
+      div.onclick = close;
+      setTimeout(close, 5000);
     }
   }
 
