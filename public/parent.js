@@ -110,7 +110,7 @@ function frame({ title, sub = "", main, bottom = "", back = false }) {
   app.innerHTML = `<div class="p-app">
     <header class="app-top">
       ${back ? `<button class="round-btn" id="hdrBack" type="button" data-voice="back" aria-label="돌아가기">${ic("back")}</button>` : ""}
-      <div class="p-title">${sub ? `<div class="p-date">${esc(sub)}</div>` : ""}<div class="p-hello">${title}</div></div>
+      <div class="p-title">${sub ? `<div class="p-date">${sub}</div>` : ""}<div class="p-hello">${title}</div></div>
       <div class="p-tools">
         <button class="round-btn" id="say" type="button" data-voice="repeat" aria-label="소리로 듣기">${ic("speaker")}</button>
         ${micBtn()}
@@ -130,7 +130,8 @@ const HOME_BOTTOM = `
 
 function shell(main, foot = true) {
   // 아이콘은 날짜 줄에 (인사말이 한 줄에 들어가게)
-  const sub = `${data.parent.avatar ? `${data.parent.avatar} ` : ""}${longDay.format(nowDate())}`;
+  const face = window.PEOPLE ? `<span class="mini-face">${window.PEOPLE.faceSvg(window.PEOPLE.resolve(data.parent.avatar, data.parent.name), 22)}</span>` : "";
+  const sub = `${face}${esc(longDay.format(nowDate()))}`;
   frame({ sub, title: `${esc(data.parent.name)}, 안녕하세요`, main, bottom: foot ? HOME_BOTTOM : "" });
   const b = document.getElementById("addSched");
   if (b) b.onclick = () => openInput();
@@ -165,7 +166,7 @@ function render() {
   if (!s) {
     // 일정 없는 날: 즐거운 하루 그림 (날마다 바뀜)
     const today = seoulDay(nowDate());
-    const sc = window.SCENES ? window.SCENES.sceneSvg(`${data.parent.name}-${today}`, data.parent.avatar) : null;
+    const sc = window.SCENES ? window.SCENES.sceneSvg(`${data.parent.name}-${today}`, data.parent.avatar, data.parent.name) : null;
     sayText = `오늘은 일정이 없어요. ${sc ? `${sc.caption}이에요. ` : ""}즐거운 하루 보내세요. 갈 곳이 생기면 일정 알려주기를 눌러 주세요.`;
     shell(sc
       ? `<div class="card rest-card">${sc.html}

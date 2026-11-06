@@ -35,13 +35,14 @@ const NOTIF_KIND = {
   taxi_reserved: ["clock", ""], family: ["family", "warn"], chosen: ["check", ""], evening: ["bell", ""],
 };
 
-// 부모님 아이콘 (고르기)
-const AVATARS = ["👵", "👴", "🧓", "👩‍🦳", "👨‍🦳", "👩", "👨", "🌸", "🌻", "🍀", "🐶", "🐱", "☕", "⭐"];
-/** 아이콘 동그라미: 고른 아이콘, 없으면 호칭 마지막 글자 */
+// 부모님 캐릭터 (people.js): 얼굴 동그라미와 작은 얼굴
+const charOf = (p) => (window.PEOPLE ? window.PEOPLE.resolve(p?.avatar, p?.name ?? "") : "");
 function avatarHtml(p, i, cls = "") {
-  const face = p?.avatar ? `<span class="emoji">${esc(p.avatar)}</span>` : esc((p?.name ?? "").slice(-1));
-  return `<span class="avatar a${i % 3} ${cls}" title="${esc(p?.name ?? "")}">${face}</span>`;
+  const face = window.PEOPLE ? window.PEOPLE.faceSvg(charOf(p), cls === "lg" ? 44 : 32) : esc((p?.name ?? "").slice(-1));
+  return `<span class="avatar face a${i % 3} ${cls}" title="${esc(p?.name ?? "")}">${face}</span>`;
 }
+/** 글자 옆에 붙는 작은 얼굴 */
+const miniFace = (p) => (window.PEOPLE && p ? `<span class="mini-face">${window.PEOPLE.faceSvg(charOf(p), 18)}</span>` : "");
 
 /** 받침에 따라 은/는: 엄마는, 민준은 */
 function eunNeun(word) {
@@ -196,7 +197,7 @@ function render() {
   $("#restBox").hidden = !resting.length || !window.SCENES;
   $("#restBox").classList.toggle("two", resting.length >= 2); // 두 분 이상이면 나란히 작게
   $("#restBox").innerHTML = window.SCENES ? resting.map((p) => {
-    const sc = window.SCENES.sceneSvg(`${p.id}-${tKey}`, p.avatar);
+    const sc = window.SCENES.sceneSvg(`${p.id}-${tKey}`, p.avatar, p.name);
     return `<div class="card rest-card">${sc.html}
       <div class="rest-text"><b>${esc(eunNeun(p.name))} 오늘 즐거운 하루를 보내고 있어요</b>${resting.length >= 2 ? "" : `<span>${esc(sc.caption)}</span>`}</div></div>`;
   }).join("") : "";
@@ -306,7 +307,7 @@ function renderCalendar(byId, nowList) {
     <div class="cal-grid cal-wd">${["일", "월", "화", "수", "목", "금", "토"].map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
     <div class="cal-grid cal-days">${cells.join("")}</div>
     <button type="button" class="cal-handle" data-toggle aria-expanded="${calOpen}">${ic(calOpen ? "up" : "down")}${calOpen ? "접기" : "한 달 보기"}</button>
-    ${state.parents.length > 1 ? `<div class="cal-legend">${state.parents.map((p, i) => `<span><i class="dot-p a${i % 3}"></i>${p.avatar ? `${esc(p.avatar)} ` : ""}${esc(p.name)}</span>`).join("")}</div>` : ""}`;
+    ${state.parents.length > 1 ? `<div class="cal-legend">${state.parents.map((p, i) => `<span><i class="dot-p a${i % 3}"></i>${miniFace(p)}${esc(p.name)}</span>`).join("")}</div>` : ""}`;
 
   // 고른 날의 일정
   const sel = new Date(kstMidnight(selDay).getTime() + 12 * 3600000);
@@ -469,7 +470,7 @@ function scheduleCard(s, p, hero) {
         <span class="sched-title">${ic(s.kind) || ic("기타")}${esc(s.title)}</span>
         <span class="sched-place">${esc(s.place_name)}${!hero && s.memo ? ` · ${esc(s.memo)}` : ""}</span>
       </span>
-      <span class="sched-side"><span class="pill ${tone}">${label}</span><span class="who">${p?.avatar ? `${esc(p.avatar)} ` : ""}${esc(p?.name ?? "")}</span></span>
+      <span class="sched-side"><span class="pill ${tone}">${label}</span><span class="who">${miniFace(p)}${esc(p?.name ?? "")}</span></span>
     </button>
     ${body}
   </div>`;
@@ -682,8 +683,9 @@ function formError(form, msg) {
 }
 
 function fillAvatarPick(el, current, onPick) {
-  el.innerHTML = AVATARS.map((a) => `<button type="button" role="radio" aria-checked="${a === current}" class="${a === current ? "on" : ""}" data-a="${a}">${a}</button>`).join("")
-    + `<button type="button" role="radio" aria-checked="${!current}" class="letter ${!current ? "on" : ""}" data-a="">글자</button>`;
+  const P = window.PEOPLE;
+  el.innerHTML = P.IDS.map((id) => `<button type="button" role="radio" aria-checked="${id === current}" class="${id === current ? "on" : ""}" data-a="${id}" aria-label="${esc(P.CHARS[id].label)}">
+    ${P.faceSvg(id, 40)}<span>${esc(P.CHARS[id].label)}</span></button>`).join("");
   el.onclick = (e) => {
     const b = e.target.closest("[data-a]");
     if (!b) return;
@@ -701,7 +703,7 @@ function openAvatarDialog(id) {
   const p = state.parents.find((x) => x.id === id);
   if (!p) return;
   avatarTarget = id;
-  avatarChoice = p.avatar || "";
+  avatarChoice = charOf(p);
   $("#avatarTitle").textContent = `${p.name} 아이콘 바꾸기`;
   fillAvatarPick($("#avatarPick2"), avatarChoice, (a) => (avatarChoice = a));
   $("#avatarDlg").showModal();
@@ -723,8 +725,7 @@ function openParentDialog() {
     parentForm.avatar.value = a;
     // 아이콘으로 호칭 채워 주기 (비어 있을 때만)
     if (!parentForm.pname.value.trim()) {
-      if (["👵", "👩‍🦳", "👩"].includes(a)) parentForm.pname.value = "엄마";
-      if (["👴", "👨‍🦳", "👨", "🧓"].includes(a)) parentForm.pname.value = "아빠";
+      parentForm.pname.value = window.PEOPLE.CHARS[a]?.kind === "m" ? "아빠" : "엄마";
     }
   });
   formError(parentForm, "");

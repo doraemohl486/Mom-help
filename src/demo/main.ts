@@ -56,7 +56,7 @@ setInterval(save, 1500);
 function seed() {
   if (db.listParents().length) return;
   const p = db.createParent({
-    name: "엄마", real_name: "김영희", avatar: "👵", phone: "010-1234-5678", home_address: "서울 마포구 월드컵로 212 (마포구청)",
+    name: "엄마", real_name: "김영희", avatar: "w1", phone: "010-1234-5678", home_address: "서울 마포구 월드컵로 212 (마포구청)",
     home_lat: 37.5663, home_lng: 126.9019, preferred_mode: null, notes: "지팡이를 쓰세요",
   });
   const tomorrow = seoulDateKey(new Date(Date.now() + 86400_000));

@@ -485,3 +485,12 @@ details.more > summary { cursor: pointer; color: var(--sub); font-size: var(--t2
 .rest-grid.two .rest-card { padding: var(--s2); gap: var(--s1); }
 .rest-grid.two .rest-text b { font-size: var(--t2); line-height: 1.35; }
 .rest-grid.two .scene { aspect-ratio: 4 / 3; }
+
+/* 캐릭터 얼굴 */
+.avatar.face { overflow: hidden; padding: 0; }
+.avatar.face svg { display: block; margin-top: 4px; }
+.mini-face { display: inline-flex; vertical-align: -4px; margin-right: 3px; border-radius: 50%; background: var(--brand-soft); overflow: hidden; }
+.mini-face svg { display: block; }
+.avatar-pick { grid-template-columns: repeat(3, 1fr); }
+.avatar-pick button { height: auto; padding: var(--s2) var(--s1); display: grid; justify-items: center; gap: var(--s1); font-size: var(--t1); font-weight: 700; color: var(--sub); }
+.avatar-pick button svg { background: var(--brand-soft); border-radius: 50%; }
