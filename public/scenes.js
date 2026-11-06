@@ -76,5 +76,65 @@
     return { id: s.id, caption: s.caption, html };
   }
 
-  window.SCENES = { sceneSvg };
+  // ---------------------------------------------------------------- 가로로 긴 한 장 (자녀 화면: 여러 분 함께)
+  // viewBox 320×80. people: 캐릭터 id 목록 (1~3명)
+  const BANNERS = [
+    {
+      id: "park",
+      caption: "공원 산책하기 좋은 날",
+      ok: () => true,
+      svg: (ids) => {
+        // 사람은 오른쪽 절반에 (왼쪽 하늘에는 글이 얹힘)
+        const xs = ids.length === 1 ? [238] : ids.length === 2 ? [218, 256] : [200, 236, 272];
+        return `<rect class="sc-sky" width="320" height="80"/>
+          <circle class="sc-sun" cx="182" cy="16" r="8"/>
+          <ellipse class="sc-hill2" cx="60" cy="86" rx="140" ry="30"/><ellipse class="sc-hill" cx="250" cy="90" rx="170" ry="32"/>
+          <path class="sc-path" d="M100 80 C 140 66, 200 64, 250 58 L 262 60 C 214 68, 170 74, 150 80 Z"/>
+          ${tree(26, 52, 10)}${tree(150, 54, 8)}${tree(306, 46, 9)}
+          ${ids.map((id, i) => P().figure(id, xs[i], 14, 0.6, "walk")).join("")}${dog(Math.min(xs[xs.length - 1] + 30, 300), 70)}`;
+      },
+    },
+    {
+      id: "tea",
+      caption: "차 한잔하기 좋은 날",
+      ok: (ids) => ids.length <= 2,
+      svg: (ids) => {
+        const [a, b] = ids.length === 1 ? [ids[0], P().friendOf(ids[0])] : ids;
+        return `<rect class="sc-wall" width="320" height="80"/>
+          <rect class="sc-window" x="226" y="8" width="38" height="28" rx="4"/>
+          <line class="sc-frame" x1="245" y1="8" x2="245" y2="36"/><circle class="sc-sun" cx="255" cy="15" r="4"/>
+          <rect class="sc-pot" x="20" y="56" width="16" height="14" rx="3"/>${tree(28, 48, 8)}
+          ${P().figure(a, 206, 22, 0.6, "sit")}${P().figure(b, 284, 22, 0.6, "sit", true)}
+          <rect class="sc-table" x="178" y="54" width="134" height="8" rx="4"/><rect class="sc-table" x="241" y="62" width="8" height="18"/>
+          <rect class="sc-cup" x="224" y="45" width="10" height="9" rx="3"/><rect class="sc-cup" x="256" y="45" width="10" height="9" rx="3"/>`;
+      },
+    },
+    {
+      id: "garden",
+      caption: "꽃 구경하기 좋은 날",
+      ok: () => true,
+      svg: (ids) => {
+        const xs = ids.length === 1 ? [240] : ids.length === 2 ? [222, 262] : [204, 240, 276];
+        return `<rect class="sc-sky" width="320" height="80"/>
+          <circle class="sc-sun" cx="186" cy="16" r="8"/>
+          <rect class="sc-ground" x="0" y="66" width="320" height="14"/>
+          ${flower(30, 58, "sc-petal1")}${flower(70, 62, "sc-petal2")}${flower(120, 58, "sc-petal3")}${flower(170, 62, "sc-petal1")}${flower(300, 58, "sc-petal2")}
+          <path class="sc-fly" d="M150 34 q-6 -8 -10 -2 q4 6 10 2 q6 -8 10 -2 q-4 6 -10 2"/>
+          ${ids.map((id, i) => P().figure(id, xs[i], 10, 0.6, "stand")).join("")}`;
+      },
+    },
+  ];
+
+  /** 여러 분을 한 장에. people: [{ avatar, name }] */
+  function bannerSvg(seed, people) {
+    const ids = people.slice(0, 3).map((p) => P().resolve(p.avatar, p.name));
+    let h = 0;
+    for (const ch of String(seed)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const usable = BANNERS.filter((b) => b.ok(ids));
+    const b = usable[h % usable.length];
+    const html = `<svg class="scene scene-wide" viewBox="0 0 320 80" role="img" aria-label="${esc(b.caption)}" preserveAspectRatio="xMidYMid slice">${b.svg(ids)}</svg>`;
+    return { id: b.id, caption: b.caption, html };
+  }
+
+  window.SCENES = { sceneSvg, bannerSvg };
 })();

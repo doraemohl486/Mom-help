@@ -183,7 +183,9 @@ function render() {
   const need = live.filter((s) => ["escalated", "call_failed"].includes(s.status)).length + (state.drafts || []).length;
   $("#summary").textContent = !parents.length ? "부모님을 등록하고 시작해요"
     : need ? `확인할 일이 ${need}개 있어요`
-      : today.length ? `오늘 일정 ${today.length}개, 잘 챙기고 있어요` : "오늘은 예정된 일정이 없어요";
+      : today.length ? `오늘 일정 ${today.length}개, 잘 챙기고 있어요` : "";
+  // 일정 없는 날은 아래 그림이 대신 말해 주므로 요약 줄을 숨김
+  $("#summary").hidden = !$("#summary").textContent;
 
   // 지금 (진행 중)
   const nowList = live.filter(isNow);
@@ -194,13 +196,17 @@ function render() {
   const tKey = dayKey(nowDate());
   const busyToday = new Set(live.filter((s) => dayKey(new Date(s.start_at)) === tKey && s.status !== "arrived").map((s) => s.parent_id));
   const resting = parents.filter((p) => !busyToday.has(p.id));
-  $("#restBox").hidden = !resting.length || !window.SCENES;
-  $("#restBox").classList.toggle("two", resting.length >= 2); // 두 분 이상이면 나란히 작게
-  $("#restBox").innerHTML = window.SCENES ? resting.map((p) => {
-    const sc = window.SCENES.sceneSvg(`${p.id}-${tKey}`, p.avatar, p.name);
-    return `<div class="card rest-card">${sc.html}
-      <div class="rest-text"><b>${esc(eunNeun(p.name))} 오늘 즐거운 하루를 보내고 있어요</b>${resting.length >= 2 ? "" : `<span>${esc(sc.caption)}</span>`}</div></div>`;
-  }).join("") : "";
+  // 여러 분이면 한 장의 그림에 함께 (가로로 긴 그림, 높이를 줄여 달력·일정과 한 화면에)
+  $("#restBox").hidden = !resting.length || !window.SCENES?.bannerSvg;
+  if (resting.length && window.SCENES?.bannerSvg) {
+    const sc = window.SCENES.bannerSvg(tKey, resting);
+    const names = resting.map((p) => p.name).join("·");
+    // 글은 그림 위(하늘 쪽)에 얹어서 높이를 더 쓰지 않음
+    $("#restBox").innerHTML = `<div class="card wide-card">${sc.html}
+      <p class="wide-text"><b>${esc(eunNeun(names))} 오늘 즐거운 하루를 보내고 있어요</b></p></div>`;
+  } else {
+    $("#restBox").innerHTML = "";
+  }
 
   // 확인 필요
   const drafts = state.drafts || [];
@@ -307,7 +313,7 @@ function renderCalendar(byId, nowList) {
     <div class="cal-grid cal-wd">${["일", "월", "화", "수", "목", "금", "토"].map((w, i) => `<span class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</span>`).join("")}</div>
     <div class="cal-grid cal-days">${cells.join("")}</div>
     <button type="button" class="cal-handle" data-toggle aria-expanded="${calOpen}">${ic(calOpen ? "up" : "down")}${calOpen ? "접기" : "한 달 보기"}</button>
-    ${state.parents.length > 1 ? `<div class="cal-legend">${state.parents.map((p, i) => `<span><i class="dot-p a${i % 3}"></i>${miniFace(p)}${esc(p.name)}</span>`).join("")}</div>` : ""}`;
+    ${state.parents.length > 1 && calOpen ? `<div class="cal-legend">${state.parents.map((p, i) => `<span><i class="dot-p a${i % 3}"></i>${miniFace(p)}${esc(p.name)}</span>`).join("")}</div>` : ""}`;
 
   // 고른 날의 일정
   const sel = new Date(kstMidnight(selDay).getTime() + 12 * 3600000);
@@ -316,8 +322,8 @@ function renderCalendar(byId, nowList) {
   const title = `${selDay === tKey ? "오늘 · " : ""}${fmtDay.format(sel)}`;
   $("#dayBox").innerHTML = `<div class="day-label">${esc(title)}</div>` + (dayList.length
     ? dayList.map((s) => scheduleCard(s, byId[s.parent_id], false)).join("")
-    : `<div class="card empty"><b>${(byDay.get(selDay) || []).length ? "위에 보이는 일정뿐이에요" : "이날은 일정이 없어요"}</b>
-        <button type="button" class="btn small" onclick="openScheduleDialog(undefined, '${selDay}')" ${selDay < tKey ? "hidden" : ""}>${ic("plus")}이날 일정 추가</button></div>`);
+    : `<div class="card day-empty"><span>${(byDay.get(selDay) || []).length ? "위에 보이는 일정뿐이에요" : "이날은 일정이 없어요"}</span>
+        <button type="button" class="btn small" onclick="openScheduleDialog(undefined, '${selDay}')" ${selDay < tKey ? "hidden" : ""}>${ic("plus")}일정 추가</button></div>`);
 }
 
 function moveMonth(delta) {

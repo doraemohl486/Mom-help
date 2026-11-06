@@ -525,3 +525,25 @@ details.more > summary { cursor: pointer; color: var(--sub); font-size: var(--t2
 .pc { padding: var(--s2); }
 .pc-cell { height: 40px; }
 .pc-cell.sel, .pc-cell.sel.sat, .pc-cell.sel.sun { color: var(--surface) !important; }
+
+/* 자녀 홈: 상태 그림 · 달력 · 일정이 한 화면에 */
+#view-home.on { gap: var(--s2); }
+#view-home .bar { margin-top: var(--s1); }
+.banner-card { padding: var(--s2); gap: var(--s1); }
+.scene.banner { aspect-ratio: 4 / 1; }
+.banner-card .rest-text { flex-wrap: nowrap; }
+.banner-card .rest-text b { font-size: var(--t2); }
+.banner-card .rest-text span { white-space: nowrap; }
+.cal { padding: var(--s2) var(--s2) var(--s1); }
+.cal-head { padding-bottom: var(--s1); }
+.cal-handle { min-height: 32px; margin-top: 0; }
+
+/* 상태 그림 한 장: 글은 그림 위에 */
+.wide-card { padding: 0; overflow: hidden; position: relative; }
+.wide-card .scene-wide { aspect-ratio: 4 / 1; border-radius: 0; }
+.wide-text { position: absolute; left: var(--s2); top: var(--s2); right: var(--s2); margin: 0; pointer-events: none; }
+.wide-text b { display: inline-block; font-size: var(--t2); line-height: 1.3; background: color-mix(in srgb, var(--surface) 88%, transparent); color: var(--ink); padding: 3px var(--s2); border-radius: var(--r1); }
+.day-empty { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); padding: var(--s2) var(--s3); color: var(--sub); font-size: var(--t2); font-weight: 700; }
+
+.wide-text { right: auto; max-width: 54%; }
+.wide-text b { display: inline; -webkit-box-decoration-break: clone; box-decoration-break: clone; line-height: 1.55; }
