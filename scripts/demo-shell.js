@@ -73,13 +73,39 @@
     const n = demo.now();
     if (q("#phoneClock")) q("#phoneClock").textContent = new Intl.DateTimeFormat("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(n);
   }
+  // 결과는 체험 도구 안에 바로 보여 준다 (폰에서는 다른 화면의 알림이 안 보이므로)
+  const goBtns = (who) => `<div class="row">${who.includes("parent") ? `<button class="btn small primary" type="button" data-go="parent">${safe(currentParent()?.name ?? "부모님")} 화면 보기</button>` : ""}${who.includes("guardian") ? `<button class="btn small" type="button" data-go="guardian">자녀 화면 보기</button>` : ""}</div>`;
+  function showResult(el, html) {
+    el.innerHTML = html;
+    el.hidden = false;
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-go]");
+    if (b) showTab(b.dataset.go);
+  });
+  let seenAll = 0;
   q("#skipBtn").onclick = async () => {
+    const p = currentParent();
+    if (!p) return showResult(q("#skipResult"), "부모님을 먼저 등록해 주세요.");
+    seenAll = demo.latestNotifications(p.token, 0).maxId;
     const label = await demo.skip();
-    toast(label ? `⏩ ${label} 시간으로 건너뛰었어요` : "다음 알림이 없어요");
     tickClock();
     pollBanner();
+    if (!label) {
+      showResult(q("#skipResult"), `더 기다릴 알림이 없어요.<br><span class="demo-note">${safe(p.name)} 화면에서 탈 것을 고르거나, 자녀 화면에서 일정을 새로 넣어 보세요.</span>${goBtns(["parent", "guardian"])}`);
+      return;
+    }
+    const got = demo.latestNotifications(p.token, seenAll);
+    const lines = [
+      ...got.parent.map((m) => `📱 <b>${safe(p.name)} 폰</b> · ${safe(m)}`),
+      ...got.guardian.map((m) => `👩 <b>자녀 폰</b> · ${safe(m)}`),
+    ];
+    const who = [got.parent.length ? "parent" : "", got.guardian.length ? "guardian" : ""];
+    showResult(q("#skipResult"), `<b>⏩ ${safe(demo.clockText())} — ${safe(label)}</b>`
+      + (lines.length ? lines.map((l) => `<div>${l}</div>`).join("") : `<div class="demo-note">새로 나간 알림은 없어요.</div>`)
+      + goBtns(who.some(Boolean) ? who : ["parent"]));
   };
-  q("#clockReset").onclick = () => { demo.resetClock(); tickClock(); toast("지금 시간으로 돌아왔어요"); };
+  q("#clockReset").onclick = () => { demo.resetClock(); tickClock(); showResult(q("#skipResult"), "지금 시간으로 돌아왔어요."); };
 
   // ---------------- 문자 오기
   const kdate = (days) => {
@@ -97,9 +123,9 @@
   q("#smsSamples").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
-    q("#smsText").value = samples[b.dataset.s]();
+    q("#demoSmsText").value = samples[b.dataset.s]();
   });
-  q("#smsText").value = samples.new();
+  q("#demoSmsText").value = samples.new();
   const RESULT = {
     created: "✅ 일정을 자동으로 넣었어요 (자녀 화면 확인)",
     duplicate: "↩️ 이미 있는 예약이라 건너뛰었어요",
@@ -109,10 +135,10 @@
   q("#smsSend").onclick = async () => {
     const p = currentParent();
     try {
-      const r = await demo.sms(p.token, q("#smsText").value);
-      q("#smsResult").textContent = RESULT[r] ?? r;
+      const r = await demo.sms(p.token, q("#demoSmsText").value);
+      showResult(q("#smsResult"), `<b>${safe(RESULT[r] ?? r)}</b>${r === "created" || r === "review" ? goBtns(["guardian"]) : ""}`);
     } catch (e) {
-      q("#smsResult").textContent = e.message;
+      showResult(q("#smsResult"), safe(e.message));
     }
   };
   q("#resetBtn").onclick = () => demo.reset();

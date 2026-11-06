@@ -34,6 +34,9 @@
 .tools textarea { min-height: 88px; }
 .demo-note { font-size: var(--t2); color: var(--sub); }
 .demo-steps { padding-left: var(--s5); margin: 0; line-height: 1.7; }
+.demo-result { background: var(--brand-soft, #fff4cc); border-radius: var(--r2); padding: var(--s3); font-size: var(--t2); line-height: 1.5; display: grid; gap: var(--s2); }
+.demo-result[hidden] { display: none; }
+.demo-result .row { flex-wrap: wrap; }
 #pane-tools { height: calc(100dvh - var(--demo-top)); overflow: auto; }
 @media (min-width: 1100px) {
   :root { --demo-top: 56px; }
@@ -87,6 +90,7 @@
           <button class="btn primary small" id="skipBtn">⏩ 다음 알림까지 건너뛰기</button>
           <button class="btn small" id="clockReset">지금 시간으로</button>
         </div>
+        <div class="demo-result" id="skipResult" hidden></div>
         <p class="demo-note">전날 알림 → 준비 알림 → "뭐 타고 가실래요?" → 무응답 시 자녀에게 → 예약 택시 호출을 순서대로 볼 수 있어요.</p>
       </div>
 
@@ -100,11 +104,11 @@
           <button type="button" data-s="meet">동창회 (안 가져옴)</button>
           <button type="button" data-s="ad">광고</button>
         </div>
-        <textarea id="smsText"></textarea>
+        <textarea id="demoSmsText" aria-label="받은 문자 내용"></textarea>
         <div class="row">
           <button class="btn primary small" id="smsSend">문자 보내기</button>
-          <span class="demo-note" id="smsResult"></span>
         </div>
+        <div class="demo-result" id="smsResult" hidden></div>
       </div>
 
       <div class="card">

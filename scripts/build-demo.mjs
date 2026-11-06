@@ -32,7 +32,8 @@ const bundle = result.outputFiles[0].text;
 
 const read = (p) => fs.readFileSync(r(p), "utf8");
 const guardianHtml = read("public/guardian.html");
-const guardianBody = guardianHtml.slice(guardianHtml.indexOf('<div class="g-app"'), guardianHtml.indexOf('<script src="/icons.js">'));
+const guardianBody = guardianHtml.slice(guardianHtml.indexOf('<div class="g-app"'), guardianHtml.indexOf('<script src="/icons.js">'))
+  .replace(/<script src="\/vendor\/[^"]*"><\/script>/g, ""); // 체험판에는 지도 파일이 없음 (없으면 지도 대신 주소만 보임)
 // 체험판 틀이 이름을 보여 주므로 자녀 화면의 큰 제목 줄은 그대로 둔다
 
 const inlineJs = (js) => js.replace(/<\/script/gi, "<\\/script");

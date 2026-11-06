@@ -156,7 +156,7 @@ const STAGE_LABEL: Record<Stage | "taxi", string> = {
 function nextEvent(now: Date) {
   let best: { at: Date; label: string; place: string } | null = null;
   const from = new Date(now.getTime() - 3 * 3600_000).toISOString();
-  const to = new Date(now.getTime() + 7 * 86400_000).toISOString();
+  const to = new Date(now.getTime() + 15 * 86400_000).toISOString();
   for (const s of db.listActiveSchedules(from, to)) {
     if (!s.departure_at) continue;
     const cands: { at: Date; label: string }[] = [];
@@ -208,6 +208,17 @@ const demo = {
   parentNotifications: (token: string) => {
     const p = db.getParentByToken(token);
     return p ? db.listNotifications("parent", p.id, 1) : [];
+  },
+  /** 가장 최근 알림 id (부모님·자녀 모두) — 건너뛰기 뒤 새로 나간 알림을 보여 주려고 */
+  latestNotifications(token: string, afterId: number) {
+    const p = db.getParentByToken(token);
+    const mine = p ? db.listNotifications("parent", p.id, 10) : [];
+    const guardian = db.listNotifications("guardian", null, 10);
+    return {
+      parent: mine.filter((n) => n.id > afterId).map((n) => n.message),
+      guardian: guardian.filter((n) => n.id > afterId).map((n) => n.message),
+      maxId: Math.max(afterId, ...mine.map((n) => n.id), ...guardian.map((n) => n.id)),
+    };
   },
   /** 부모님 폰에 문자가 온 것처럼 */
   async sms(token: string, text: string) {
